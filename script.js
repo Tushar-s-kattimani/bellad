@@ -17,9 +17,12 @@ localStorage.removeItem = function(key) {
 };
 
 let syncTimeout = null;
+let isSyncing = false;
+
 function syncToNeon() {
     if (syncTimeout) clearTimeout(syncTimeout);
     syncTimeout = setTimeout(async () => {
+        isSyncing = true;
         try {
             const employeesList = JSON.parse(localStorage.getItem('employeesList') || '[]');
             const bulkAttendance = JSON.parse(localStorage.getItem('bulkAttendance') || '{}');
@@ -58,6 +61,9 @@ function syncToNeon() {
             console.log("Successfully synced to Neon DB");
         } catch (err) {
             console.error("Error syncing to Neon:", err);
+        } finally {
+            syncTimeout = null;
+            isSyncing = false;
         }
     }, 2000);
 }
@@ -124,21 +130,25 @@ function initApp() {
     let advanceBalances = JSON.parse(localStorage.getItem('advanceBalances')) || {};
     let advanceHistory = JSON.parse(localStorage.getItem('advanceHistory')) || [];
 
-    // Initialize Neon Sync In
-    isStorageReady = false;
-    (async () => {
+    async function fetchFromNeon(isInitialLoad = false) {
+        // Don't poll if we are actively syncing local changes outward
+        if (!isInitialLoad && (isSyncing || syncTimeout)) return;
+        
+        isStorageReady = false;
         try {
             const dbEmployees = await sql`SELECT * FROM bellad_employees`;
             const dbAttendance = await sql`SELECT * FROM bellad_attendance`;
             const dbAdvHistory = await sql`SELECT * FROM bellad_advance_history`;
             const dbAdvBalances = await sql`SELECT * FROM bellad_advance_balances`;
 
-            if (dbEmployees.length > 0) {
-                employees = dbEmployees.map(row => ({
-                    id: row.id, name: row.name, initial: row.initial, bg: row.bg, 
-                    role: row.role, salaryType: row.salarytype, salaryAmount: Number(row.salaryamount)
-                }));
-                originalSetItem.call(localStorage, 'employeesList', JSON.stringify(employees));
+            if (dbEmployees.length > 0 || !isInitialLoad) {
+                if (dbEmployees.length > 0) {
+                    employees = dbEmployees.map(row => ({
+                        id: row.id, name: row.name, initial: row.initial, bg: row.bg, 
+                        role: row.role, salaryType: row.salarytype, salaryAmount: Number(row.salaryamount)
+                    }));
+                    originalSetItem.call(localStorage, 'employeesList', JSON.stringify(employees));
+                }
                 
                 bulkAttendanceData = {};
                 for (const row of dbAttendance) {
@@ -166,14 +176,21 @@ function initApp() {
                 if (typeof renderDashboard === 'function') renderDashboard();
                 if (typeof renderEmployeeGrid === 'function' && document.getElementById('employees').classList.contains('active')) renderEmployeeGrid();
             } else {
+                // If initial load and DB is empty, push our local default employees up
                 syncToNeon();
             }
-            isStorageReady = true;
         } catch (err) {
             console.error("Neon DB Fetch Error:", err);
+        } finally {
             isStorageReady = true;
         }
-    })();
+    }
+
+    // Initialize data
+    fetchFromNeon(true);
+    
+    // Setup polling every 5 seconds for real-time multi-device sync
+    setInterval(() => fetchFromNeon(false), 5000);
 
 
     // Handle SPA navigation
