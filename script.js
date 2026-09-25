@@ -841,15 +841,14 @@ function initApp() {
         if(dashAbsent) dashAbsent.textContent = absentCount;
         if(dashHalfday) dashHalfday.textContent = halfdayCount;
         
-        const totalMarked = presentCount + absentCount + halfdayCount;
         const totalStaff = employees.length;
-        const progressPct = totalStaff === 0 ? 0 : Math.round((totalMarked / totalStaff) * 100);
+        const progressPct = totalStaff === 0 ? 0 : Math.round((presentCount / totalStaff) * 100);
         
         const progressTextEl = document.getElementById('dash-progress-text');
         const progressBarEl = document.getElementById('dash-progress-bar');
         const progressPctEl = document.getElementById('dash-progress-pct');
         
-        if (progressTextEl) progressTextEl.textContent = `${totalMarked} of ${totalStaff} marked today`;
+        if (progressTextEl) progressTextEl.textContent = `${presentCount} of ${totalStaff} present today`;
         if (progressBarEl) progressBarEl.style.width = `${progressPct}%`;
         if (progressPctEl) progressPctEl.textContent = `${progressPct}%`;
         
