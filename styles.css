@@ -409,7 +409,25 @@ body {
 
 @media (max-width: 480px) {
     .stats-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+    
+    .stat-card {
+        padding: 15px 10px;
+    }
+    
+    .stat-value {
+        font-size: 22px;
+    }
+    
+    .card-icon {
+        font-size: 16px;
+        margin-bottom: 8px;
+    }
+    
+    .stat-label {
+        font-size: 10px;
     }
 }
 
