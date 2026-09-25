@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Management Dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Auth Overlay -->
+    <div id="auth-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0f172a; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white;">
+        <i class="fa-solid fa-lock" style="font-size: 48px; margin-bottom: 20px; color: #3b82f6;"></i>
+        <h2 style="margin-bottom: 10px; font-weight: 600;">Security Lock</h2>
+        <p style="margin-bottom: 20px; color: #94a3b8;">Please enter the manager PIN to access.</p>
+        <div style="display: flex; gap: 10px;">
+            <input type="password" id="auth-pin-input" placeholder="Enter PIN" style="padding: 12px 20px; border-radius: 8px; border: none; outline: none; font-size: 18px; width: 200px; text-align: center; letter-spacing: 4px; color: #0f172a; font-weight: 600;">
+            <button id="auth-pin-btn" class="btn" style="padding: 12px 24px; font-size: 16px; background-color: #3b82f6; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">Unlock</button>
+        </div>
+        <p id="auth-error" style="color: #ef4444; margin-top: 15px; display: none; font-weight: 500;">Incorrect PIN. Please try again.</p>
+    </div>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" data-page="dashboard">
+                    <i class="fa-solid fa-house-chimney"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="nav-item" data-page="attendance">
+                    <i class="fa-regular fa-calendar-check"></i>
+                    <span>Attendance</span>
+                </a>
+                <a href="#" class="nav-item" data-page="employees">
+                    <i class="fa-solid fa-user-group"></i>
+                    <span>Employees</span>
+                </a>
+                <a href="#" class="nav-item" data-page="salary">
+                    <i class="fa-solid fa-indian-rupee-sign"></i>
+                    <span>Salary</span>
+                </a>
+                <a href="#" class="nav-item" data-page="advances">
+                    <i class="fa-solid fa-money-bill"></i>
+                    <span>Advances</span>
+                </a>
+                <a href="#" class="nav-item" data-page="settings">
+                    <i class="fa-solid fa-gear"></i>
+                    <span>Settings</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-content">
+                    <h1>Bellad Petrol Bunk</h1>
+                    <p id="header-subtitle">Employee Management</p>
+                </div>
+            </header>
+
+            <!-- Page Sections Container -->
+            <div class="pages-container">
+                
+                <!-- Dashboard Page -->
+                <section id="dashboard" class="page-section active">
+                    <div class="page-header">
+                        <h2>Overview</h2>
+                        <p id="current-date">Thursday, 24 September 2026</p>
+                    </div>
+
+                    <!-- Stats Grid -->
+                    <div class="stats-grid">
+                        <div class="stat-card card-blue">
+                            <div class="card-icon"><i class="fa-solid fa-user-group"></i></div>
+                            <h3 class="stat-value" id="dash-total-staff">0</h3>
+                            <p class="stat-label">TOTAL STAFF</p>
+                        </div>
+                        <div class="stat-card card-green">
+                            <div class="card-icon"><i class="fa-regular fa-circle-check"></i></div>
+                            <h3 class="stat-value" id="dash-present">0</h3>
+                            <p class="stat-label">PRESENT</p>
+                        </div>
+                        <div class="stat-card card-red">
+                            <div class="card-icon"><i class="fa-regular fa-circle-xmark"></i></div>
+                            <h3 class="stat-value" id="dash-absent">0</h3>
+                            <p class="stat-label">ABSENT</p>
+                        </div>
+                        <div class="stat-card card-yellow">
+                            <div class="card-icon"><i class="fa-regular fa-clock"></i></div>
+                            <h3 class="stat-value" id="dash-halfday">0</h3>
+                            <p class="stat-label">HALF DAY</p>
+                        </div>
+                    </div>
+
+                    <!-- Progress Section -->
+                    <div class="progress-section">
+                        <div class="progress-header">
+                            <h3>Attendance Progress (Today)</h3>
+                            <span class="progress-percentage" id="dash-progress-pct">0%</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-fill" id="dash-progress-bar" style="width: 0%;"></div>
+                        </div>
+                        <p class="progress-subtitle" id="dash-progress-text">0 of 0 marked today</p>
+                    </div>
+
+                    <!-- Exceptions Section -->
+                    <div class="premium-card mb-20" style="margin-top: 20px;">
+                        <h3 class="card-title" style="margin-top: 0; margin-bottom: 15px; font-size: 16px;">Today's Exceptions</h3>
+                        <div id="dash-exceptions-list" style="display: flex; flex-direction: column; gap: 10px;">
+                            <div style="color: var(--text-gray); font-size: 14px; padding: 10px; background: var(--bg-light); border-radius: 6px;">No exceptions to show for today.</div>
+                        </div>
+                    </div>
+
+                    <!-- Actions Section -->
+                    <div class="actions-section">
+                        <button class="btn btn-primary" id="btn-mark-attendance">
+                            <i class="fa-regular fa-calendar-check"></i> Mark Attendance Now
+                        </button>
+                        <button class="btn btn-secondary nav-trigger" data-target="employees">
+                            <i class="fa-solid fa-user-group"></i> Manage Employees
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Attendance Page -->
+                <section id="attendance" class="page-section">
+                    <div class="page-header flex-between">
+                        <div>
+                            <h2>Daily Attendance</h2>
+                            <p>Mark attendance for your employees</p>
+                        </div>
+                        <div class="action-group" style="align-items: center; position: relative;">
+                            <span id="selected-date-display" style="margin-right: 15px; font-weight: 600; font-size: 14px; color: var(--primary-blue);"></span>
+                            <button id="btn-toggle-calendar" class="btn btn-secondary btn-sm">
+                                <i class="fa-solid fa-calendar-days"></i> Select Date
+                            </button>
+                            
+                            <!-- Custom Calendar Popup -->
+                            <div id="calendar-popup" class="premium-card" style="display: none; position: absolute; top: 100%; right: 0; margin-top: 10px; width: 350px; z-index: 100; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+                                <div class="calendar-header flex-between mb-10">
+                                    <button id="cal-prev-month" class="btn-icon"><i class="fa-solid fa-chevron-left"></i></button>
+                                    <h3 id="cal-month-display" style="margin: 0; font-size: 16px; font-weight: 600;">September 2026</h3>
+                                    <button id="cal-next-month" class="btn-icon"><i class="fa-solid fa-chevron-right"></i></button>
+                                </div>
+                                <div class="calendar-grid-header">
+                                    <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+                                </div>
+                                <div id="calendar-days" class="calendar-grid">
+                                    <!-- Dynamic days -->
+                                </div>
+                                <div class="calendar-legend mt-10" style="display: flex; gap: 10px; font-size: 11px; color: var(--text-gray); justify-content: center;">
+                                    <div style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #fee2e2; border: 1px solid #fca5a5;"></span> Unmarked</div>
+                                    <div style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #fef3c7; border: 1px solid #fcd34d;"></span> Partial</div>
+                                    <div style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #dcfce7; border: 1px solid #86efac;"></span> Complete</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="premium-card">
+                        <div class="table-responsive">
+                            <table class="premium-table">
+                                <thead>
+                                    <tr>
+                                        <th>Employee</th>
+                                        <th style="text-align: center;">Status (P/A/H)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="daily-attendance-body">
+                                    <!-- Dynamic rows will go here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Employees Page -->
+                <section id="employees" class="page-section">
+                    <div class="page-header flex-between">
+                        <div>
+                            <h2>Employee Directory</h2>
+                            <p>Manage your workforce</p>
+                        </div>
+                        <button id="btn-add-emp-trigger" class="btn btn-primary btn-sm"><i class="fa-solid fa-plus"></i> Add Employee</button>
+                    </div>
+                    
+                    <div class="employee-grid" id="dynamic-employee-grid">
+                        <!-- Dynamic Employee Cards will go here -->
+                    </div>
+                </section>
+
+                <!-- Salary Page -->
+                <section id="salary" class="page-section">
+                    <div class="page-header flex-between">
+                        <div>
+                            <h2>Salary & Payroll</h2>
+                            <p>Manage compensation for <span id="salary-month-display">September 2026</span></p>
+                        </div>
+                        <div class="action-group" style="align-items: center;">
+                            <input type="month" id="salary-month-picker" class="form-control" style="width: auto; padding: 6px 12px;">
+                        </div>
+                    </div>
+
+                    <div class="salary-banner" style="background-color: #03488f; color: white; padding: 25px 30px; border-radius: 8px; margin-bottom: 20px;">
+                        <p style="margin: 0; font-size: 16px; font-weight: 500;">Total Estimated Payout</p>
+                        <h2 id="total-estimated-payout" style="margin: 8px 0 0 0; font-size: 36px; font-weight: 700;">₹0.00</h2>
+                    </div>
+
+                    <div class="premium-card">
+                        <div class="table-responsive">
+                            <table class="premium-table">
+                                <thead>
+                                    <tr>
+                                        <th>Employee</th>
+                                        <th style="text-align: center;">Working Days</th>
+                                        <th style="text-align: center;">Present</th>
+                                        <th style="text-align: center;">Absent</th>
+                                        <th style="text-align: center;">Half Day</th>
+                                        <th style="text-align: right;">Salary Breakdown</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="salary-table-body">
+                                    <!-- Dynamic rows will go here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Advances Page -->
+                <section id="advances" class="page-section">
+                    <div class="page-header flex-between">
+                        <div>
+                            <h2>Advances</h2>
+                            <p>Manage employee advances</p>
+                        </div>
+                    </div>
+                    
+                    <div class="premium-card mb-20">
+                        <h3 class="card-title" style="margin-top: 0; margin-bottom: 20px;">Give New Advance</h3>
+                        <div style="display: flex; flex-direction: column; gap: 15px;">
+                            <div>
+                                <label style="display: block; font-size: 14px; font-weight: 500; margin-bottom: 8px;">Employee</label>
+                                <select id="advance-employee-select" class="form-control" style="width: 100%;">
+                                    <option value="" disabled selected>Select Employee</option>
+                                    <!-- Dynamic Options -->
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 14px; font-weight: 500; margin-bottom: 8px;">Amount (₹)</label>
+                                <input type="number" id="advance-amount" class="form-control" style="width: 100%;" placeholder="e.g. 5000">
+                            </div>
+                            <button id="btn-give-advance" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; font-weight: 600; margin-top: 5px;">
+                                <i class="fa-solid fa-plus"></i> Give Advance
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                        <button class="btn btn-secondary" style="flex: 1; justify-content: center; border-radius: 8px; border: 1px solid var(--primary-blue);" id="tab-advances-balances">Current Balances</button>
+                        <button class="btn btn-secondary" style="flex: 1; justify-content: center; border-radius: 8px; background: transparent; color: var(--primary-blue); border: 1px solid var(--primary-blue);" id="tab-advances-history">Recent Transactions</button>
+                    </div>
+
+                    <div id="advance-balances-view" class="premium-card">
+                        <div class="table-responsive">
+                            <table class="premium-table">
+                                <thead>
+                                    <tr>
+                                        <th>Employee</th>
+                                        <th style="text-align: right;">Current Advance Balance</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="advance-balances-body">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div id="advance-history-view" class="premium-card" style="display: none;">
+                        <div class="table-responsive">
+                            <table class="premium-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Employee</th>
+                                        <th style="text-align: right;">Amount Given</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="advance-history-body">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Settings Page -->
+                <section id="settings" class="page-section">
+                    <div class="page-header">
+                        <h2>Settings</h2>
+                        <p>Manage application data and preferences</p>
+                    </div>
+
+                    <div class="premium-card">
+                        <h3 class="card-title" style="display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-gear"></i> Data Management
+                        </h3>
+                        
+                        <div style="background-color: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 20px; margin-top: 15px;">
+                            <h4 style="color: #ef4444; margin: 0 0 10px 0; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+                                <i class="fa-solid fa-triangle-exclamation"></i> Reset Application Data
+                            </h4>
+                            <p style="color: #4b5563; font-size: 14px; margin: 0 0 10px 0; line-height: 1.5;">
+                                This action will permanently delete all daily attendance records AND all employee advance histories. Use this to start a fresh tracking period (e.g., a new financial year).
+                            </p>
+                            <p style="color: #4b5563; font-size: 14px; margin: 0 0 20px 0;">
+                                <strong>Note:</strong> Employee profiles (names, roles, monthly salary) will remain intact.
+                            </p>
+                            
+                            <button id="btn-reset-data" class="btn" style="background-color: #ef4444; color: white; border: none; width: 100%; justify-content: center; padding: 12px; font-weight: 600; border-radius: 6px;">
+                                Reset All Data
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+
+        <!-- Attendance Modal -->
+        <div id="attendance-modal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header flex-between">
+                    <h3>Log New Attendance</h3>
+                    <button class="btn-icon btn-close-modal" type="button"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <form id="attendance-form" class="settings-form">
+                    <div class="form-group">
+                        <label>Employee</label>
+                        <select id="att-employee" class="form-control" required>
+                            <option value="">Select Employee</option>
+                            <option value="Rahul Sharma">Rahul Sharma</option>
+                            <option value="Priya Mehta">Priya Mehta</option>
+                            <option value="Amit Kumar">Amit Kumar</option>
+                            <option value="Sneha Joshi">Sneha Joshi</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Date</label>
+                        <input type="date" id="att-date" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="att-status" class="form-control" required>
+                            <option value="Present">Present</option>
+                            <option value="Half Day">Half Day</option>
+                            <option value="Absent">Absent</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Check In Time</label>
+                        <input type="time" id="att-checkin" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Check Out Time</label>
+                        <input type="time" id="att-checkout" class="form-control">
+                    </div>
+                    <div class="modal-actions mt-20" style="display: flex; justify-content: flex-end; gap: 10px;">
+                        <button type="button" class="btn btn-secondary btn-close-modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Record</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- Employee Edit Modal -->
+        <div id="employee-edit-modal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header flex-between">
+                    <h3>Edit Employee</h3>
+                    <button class="btn-icon btn-close-emp-modal" type="button"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <form id="employee-edit-form" class="settings-form">
+                    <input type="hidden" id="edit-emp-id">
+                    <div class="form-group">
+                        <label>Employee Name</label>
+                        <input type="text" id="edit-emp-name" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Salary Type</label>
+                        <select id="edit-emp-salary-type" class="form-control" required>
+                            <option value="monthly">Monthly Base</option>
+                            <option value="daily">Daily Base</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Base Salary Amount (₹)</label>
+                        <input type="number" id="edit-emp-salary-amount" class="form-control" required step="0.01">
+                    </div>
+                    <div class="modal-actions mt-20" style="display: flex; justify-content: flex-end; gap: 10px;">
+                        <button type="button" class="btn btn-secondary btn-close-emp-modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- Employee Add Modal -->
+        <div id="employee-add-modal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header flex-between">
+                    <h3>Add Employee</h3>
+                    <button class="btn-icon btn-close-add-emp-modal" type="button"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <form id="employee-add-form" class="settings-form">
+                    <div class="form-group">
+                        <label>Employee Name</label>
+                        <input type="text" id="add-emp-name" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Salary Type</label>
+                        <select id="add-emp-salary-type" class="form-control" required>
+                            <option value="monthly">Monthly Base</option>
+                            <option value="daily">Daily Base</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Base Salary Amount (₹)</label>
+                        <input type="number" id="add-emp-salary-amount" class="form-control" required step="0.01">
+                    </div>
+                    <div class="modal-actions mt-20" style="display: flex; justify-content: flex-end; gap: 10px;">
+                        <button type="button" class="btn btn-secondary btn-close-add-emp-modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Add Employee</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+    <script type="module" src="script.js"></script>
+</body>
+</html>
