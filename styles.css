@@ -864,3 +864,75 @@ body {
     text-decoration: underline;
     text-underline-offset: 4px;
 }
+
+/* --- Comprehensive Mobile Fixes --- */
+@media (max-width: 768px) {
+    .pages-container {
+        padding: 20px 15px;
+    }
+    
+    .premium-card {
+        padding: 15px;
+    }
+    
+    .page-header.flex-between {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+    
+    .page-header .action-group {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    #calendar-popup {
+        right: auto !important;
+        left: 50% !important;
+        transform: translateX(-50%);
+        width: 310px !important;
+        max-width: 95vw;
+    }
+    
+    .modal-content {
+        padding: 20px;
+        margin: 15px;
+        width: 100%;
+    }
+    
+    .salary-banner {
+        padding: 15px 20px !important;
+    }
+    
+    .settings-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .employee-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .btn {
+        width: 100%;
+    }
+    
+    .nav-item {
+        padding: 10px 15px;
+        font-size: 14px;
+    }
+    
+    .premium-table th, .premium-table td {
+        padding: 12px 10px;
+    }
+    
+    /* Responsive Attendance Radio */
+    .toggle-label span {
+        width: 30px;
+        height: 30px;
+        font-size: 12px;
+    }
+}
