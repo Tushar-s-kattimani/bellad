@@ -27,26 +27,26 @@ function syncToNeon() {
             const advanceHistory = JSON.parse(localStorage.getItem('advanceHistory') || '[]');
 
             // Sync Employees
+            await sql`DELETE FROM bellad_employees`;
             for (const emp of employeesList) {
                 await sql`INSERT INTO bellad_employees (id, name, initial, bg, role, salaryType, salaryAmount) 
-                          VALUES (${emp.id}, ${emp.name}, ${emp.initial}, ${emp.bg}, ${emp.role}, ${emp.salaryType}, ${emp.salaryAmount})
-                          ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, bg=EXCLUDED.bg, initial=EXCLUDED.initial, role=EXCLUDED.role, salaryType=EXCLUDED.salaryType, salaryAmount=EXCLUDED.salaryAmount`;
+                          VALUES (${emp.id}, ${emp.name}, ${emp.initial}, ${emp.bg}, ${emp.role}, ${emp.salaryType}, ${emp.salaryAmount})`;
             }
 
             // Sync Attendance
+            await sql`DELETE FROM bellad_attendance`;
             for (const [date, records] of Object.entries(bulkAttendance)) {
                 for (const [empId, status] of Object.entries(records)) {
                     await sql`INSERT INTO bellad_attendance (date, employee_id, status) 
-                              VALUES (${date}, ${empId}, ${status})
-                              ON CONFLICT (date, employee_id) DO UPDATE SET status=EXCLUDED.status`;
+                              VALUES (${date}, ${empId}, ${status})`;
                 }
             }
 
             // Sync Advance Balances
+            await sql`DELETE FROM bellad_advance_balances`;
             for (const [empId, balance] of Object.entries(advanceBalances)) {
                 await sql`INSERT INTO bellad_advance_balances (empId, balance) 
-                          VALUES (${empId}, ${balance})
-                          ON CONFLICT (empId) DO UPDATE SET balance=EXCLUDED.balance`;
+                          VALUES (${empId}, ${balance})`;
             }
 
             // Sync Advance History
