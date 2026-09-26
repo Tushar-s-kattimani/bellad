@@ -18,9 +18,11 @@ localStorage.removeItem = function(key) {
 
 let syncTimeout = null;
 let isSyncing = false;
+let currentSyncId = 0;
 
 function syncToNeon() {
     if (syncTimeout) clearTimeout(syncTimeout);
+    const syncId = ++currentSyncId;
     syncTimeout = setTimeout(async () => {
         isSyncing = true;
         try {
@@ -30,42 +32,60 @@ function syncToNeon() {
             const advanceHistory = JSON.parse(localStorage.getItem('advanceHistory') || '[]');
 
             // Sync Employees
-            await sql`DELETE FROM bellad_employees`;
-            for (const emp of employeesList) {
-                await sql`INSERT INTO bellad_employees (id, name, initial, bg, role, salaryType, salaryAmount) 
-                          VALUES (${emp.id}, ${emp.name}, ${emp.initial}, ${emp.bg}, ${emp.role}, ${emp.salaryType}, ${emp.salaryAmount})`;
+            if (employeesList.length === 0) {
+                await sql`DELETE FROM bellad_employees`;
+            } else {
+                for (const emp of employeesList) {
+                    await sql`INSERT INTO bellad_employees (id, name, initial, bg, role, salaryType, salaryAmount) 
+                              VALUES (${emp.id}, ${emp.name}, ${emp.initial}, ${emp.bg}, ${emp.role}, ${emp.salaryType}, ${emp.salaryAmount})
+                              ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, initial = EXCLUDED.initial, bg = EXCLUDED.bg, role = EXCLUDED.role, salaryType = EXCLUDED.salarytype, salaryAmount = EXCLUDED.salaryamount`;
+                }
             }
 
             // Sync Attendance
-            await sql`DELETE FROM bellad_attendance`;
-            for (const [date, records] of Object.entries(bulkAttendance)) {
-                for (const [empId, status] of Object.entries(records)) {
-                    await sql`INSERT INTO bellad_attendance (date, employee_id, status) 
-                              VALUES (${date}, ${empId}, ${status})`;
+            if (Object.keys(bulkAttendance).length === 0) {
+                await sql`DELETE FROM bellad_attendance`;
+            } else {
+                for (const [date, records] of Object.entries(bulkAttendance)) {
+                    for (const [empId, status] of Object.entries(records)) {
+                        await sql`INSERT INTO bellad_attendance (date, employee_id, status) 
+                                  VALUES (${date}, ${empId}, ${status})
+                                  ON CONFLICT (date, employee_id) DO UPDATE SET status = EXCLUDED.status`;
+                    }
                 }
             }
 
             // Sync Advance Balances
-            await sql`DELETE FROM bellad_advance_balances`;
-            for (const [empId, balance] of Object.entries(advanceBalances)) {
-                await sql`INSERT INTO bellad_advance_balances (empId, balance) 
-                          VALUES (${empId}, ${balance})`;
+            if (Object.keys(advanceBalances).length === 0) {
+                await sql`DELETE FROM bellad_advance_balances`;
+            } else {
+                for (const [empId, balance] of Object.entries(advanceBalances)) {
+                    await sql`INSERT INTO bellad_advance_balances (empId, balance) 
+                              VALUES (${empId}, ${balance})
+                              ON CONFLICT (empId) DO UPDATE SET balance = EXCLUDED.balance`;
+                }
             }
 
             // Sync Advance History
-            await sql`DELETE FROM bellad_advance_history`;
-            for (const record of advanceHistory) {
-                await sql`INSERT INTO bellad_advance_history (empId, amount, date) VALUES (${record.empId}, ${record.amount}, ${record.date})`;
+            if (advanceHistory.length === 0) {
+                await sql`DELETE FROM bellad_advance_history`;
+            } else {
+                await sql`DELETE FROM bellad_advance_history`;
+                for (const record of advanceHistory) {
+                    await sql`INSERT INTO bellad_advance_history (empId, amount, date) VALUES (${record.empId}, ${record.amount}, ${record.date})`;
+                }
             }
 
             console.log("Successfully synced to Neon DB");
         } catch (err) {
             console.error("Error syncing to Neon:", err);
         } finally {
-            syncTimeout = null;
-            isSyncing = false;
+            if (currentSyncId === syncId) {
+                syncTimeout = null;
+                isSyncing = false;
+            }
         }
-    }, 2000);
+    }, 300);
 }
 
 function initApp() {
@@ -189,8 +209,8 @@ function initApp() {
     // Initialize data
     fetchFromNeon(true);
     
-    // Setup polling every 5 seconds for real-time multi-device sync
-    setInterval(() => fetchFromNeon(false), 5000);
+    // Setup polling every 1.5 seconds for real-time multi-device sync
+    setInterval(() => fetchFromNeon(false), 1500);
 
 
     // Handle SPA navigation
