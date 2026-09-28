@@ -978,3 +978,11 @@ body {
         font-size: 12px;
     }
 }
+
+/* Future Dates Disabled */
+.cal-day.future-disabled {
+    opacity: 0.3;
+    pointer-events: none;
+    cursor: not-allowed;
+    background-color: transparent !important;
+}

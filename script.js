@@ -1,7 +1,4 @@
-import { neon } from "https://esm.sh/@neondatabase/serverless";
-
-const sql = neon('postgresql://neondb_owner:npg_kNS3liz6EgKq@ep-weathered-hill-b55m67c1-pooler.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require');
-
+// Database sync via backend API
 let isStorageReady = false;
 
 const originalSetItem = localStorage.setItem;
@@ -31,54 +28,22 @@ function syncToNeon() {
             const advanceBalances = JSON.parse(localStorage.getItem('advanceBalances') || '{}');
             const advanceHistory = JSON.parse(localStorage.getItem('advanceHistory') || '[]');
 
-            // Sync Employees
-            if (employeesList.length === 0) {
-                await sql`DELETE FROM bellad_employees`;
-            } else {
-                for (const emp of employeesList) {
-                    await sql`INSERT INTO bellad_employees (id, name, initial, bg, role, salaryType, salaryAmount) 
-                              VALUES (${emp.id}, ${emp.name}, ${emp.initial}, ${emp.bg}, ${emp.role}, ${emp.salaryType}, ${emp.salaryAmount})
-                              ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, initial = EXCLUDED.initial, bg = EXCLUDED.bg, role = EXCLUDED.role, salaryType = EXCLUDED.salarytype, salaryAmount = EXCLUDED.salaryamount`;
-                }
-            }
+            const response = await fetch('/api/data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    employeesList,
+                    bulkAttendance,
+                    advanceBalances,
+                    advanceHistory
+                })
+            });
 
-            // Sync Attendance
-            if (Object.keys(bulkAttendance).length === 0) {
-                await sql`DELETE FROM bellad_attendance`;
-            } else {
-                for (const [date, records] of Object.entries(bulkAttendance)) {
-                    for (const [empId, status] of Object.entries(records)) {
-                        await sql`INSERT INTO bellad_attendance (date, employee_id, status) 
-                                  VALUES (${date}, ${empId}, ${status})
-                                  ON CONFLICT (date, employee_id) DO UPDATE SET status = EXCLUDED.status`;
-                    }
-                }
-            }
+            if (!response.ok) throw new Error("Failed to sync to backend");
 
-            // Sync Advance Balances
-            if (Object.keys(advanceBalances).length === 0) {
-                await sql`DELETE FROM bellad_advance_balances`;
-            } else {
-                for (const [empId, balance] of Object.entries(advanceBalances)) {
-                    await sql`INSERT INTO bellad_advance_balances (empId, balance) 
-                              VALUES (${empId}, ${balance})
-                              ON CONFLICT (empId) DO UPDATE SET balance = EXCLUDED.balance`;
-                }
-            }
-
-            // Sync Advance History
-            if (advanceHistory.length === 0) {
-                await sql`DELETE FROM bellad_advance_history`;
-            } else {
-                await sql`DELETE FROM bellad_advance_history`;
-                for (const record of advanceHistory) {
-                    await sql`INSERT INTO bellad_advance_history (empId, amount, date) VALUES (${record.empId}, ${record.amount}, ${record.date})`;
-                }
-            }
-
-            console.log("Successfully synced to Neon DB");
+            console.log("Successfully synced to Backend API");
         } catch (err) {
-            console.error("Error syncing to Neon:", err);
+            console.error("Error syncing to Backend:", err);
         } finally {
             if (currentSyncId === syncId) {
                 syncTimeout = null;
@@ -156,10 +121,14 @@ function initApp() {
         
         isStorageReady = false;
         try {
-            const dbEmployees = await sql`SELECT * FROM bellad_employees`;
-            const dbAttendance = await sql`SELECT * FROM bellad_attendance`;
-            const dbAdvHistory = await sql`SELECT * FROM bellad_advance_history`;
-            const dbAdvBalances = await sql`SELECT * FROM bellad_advance_balances`;
+            const response = await fetch('/api/data');
+            if (!response.ok) throw new Error("Failed to fetch from backend");
+            const data = await response.json();
+            
+            const dbEmployees = data.employees || [];
+            const dbAttendance = data.attendance || [];
+            const dbAdvHistory = data.advanceHistory || [];
+            const dbAdvBalances = data.advanceBalances || [];
 
             if (dbEmployees.length > 0 || !isInitialLoad) {
                 if (dbEmployees.length > 0) {
@@ -200,7 +169,7 @@ function initApp() {
                 syncToNeon();
             }
         } catch (err) {
-            console.error("Neon DB Fetch Error:", err);
+            console.error("Backend API Fetch Error:", err);
         } finally {
             isStorageReady = true;
         }
@@ -449,14 +418,19 @@ function initApp() {
             
             const isSelected = selectedCalDate === dateStr ? 'selected' : '';
             const isToday = todayStr === dateStr ? 'today' : '';
+            const isFuture = dateStr > todayStr ? 'future-disabled' : '';
             
-            const dayHTML = `<div class="cal-day ${statusClass} ${isSelected} ${isToday}" data-date="${dateStr}">${i}</div>`;
+            const dayHTML = `<div class="cal-day ${statusClass} ${isSelected} ${isToday} ${isFuture}" data-date="${dateStr}">${i}</div>`;
             calendarDays.insertAdjacentHTML('beforeend', dayHTML);
         }
         
         // Bind clicks
         document.querySelectorAll('.cal-day:not(.empty)').forEach(dayEl => {
             dayEl.addEventListener('click', (e) => {
+                if (e.target.classList.contains('future-disabled')) {
+                    // Ignore clicks on future dates
+                    return;
+                }
                 selectedCalDate = e.target.dataset.date;
                 renderCalendar(); // re-render to update selected styling
                 renderDailyAttendance(); // re-render attendance list
@@ -470,9 +444,9 @@ function initApp() {
         });
     }
 
+    let lastRenderedDate = null;
     function renderDailyAttendance() {
         if (!dailyAttendanceBody) return;
-        dailyAttendanceBody.innerHTML = '';
         
         const selectedDate = selectedCalDate;
         
@@ -484,6 +458,21 @@ function initApp() {
             displaySpan.textContent = dateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
         }
         const recordsForDate = bulkAttendanceData[selectedDate] || {};
+        
+        if (lastRenderedDate === selectedDate && dailyAttendanceBody.children.length > 0) {
+            // Just update radio buttons without rebuilding DOM
+            employees.forEach(emp => {
+                const status = recordsForDate[emp.id] || '';
+                const radios = dailyAttendanceBody.querySelectorAll(`input[name="status_${emp.id}"]`);
+                radios.forEach(r => {
+                    r.checked = (r.value === status);
+                });
+            });
+            return;
+        }
+        
+        lastRenderedDate = selectedDate;
+        dailyAttendanceBody.innerHTML = '';
         
         employees.forEach(emp => {
             const status = recordsForDate[emp.id] || ''; // default to unselected
@@ -536,10 +525,19 @@ function initApp() {
                     }
                 }
                 
-                // Save to local storage
+                // Update local memory
                 if (!bulkAttendanceData[selectedDate]) bulkAttendanceData[selectedDate] = {};
                 bulkAttendanceData[selectedDate][empId] = newStatus;
-                localStorage.setItem('bulkAttendance', JSON.stringify(bulkAttendanceData));
+                
+                // Save locally but bypass the heavy bulk sync hook
+                originalSetItem.call(localStorage, 'bulkAttendance', JSON.stringify(bulkAttendanceData));
+                
+                // Fast path sync to backend
+                fetch('/api/mark-attendance', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ date: selectedDate, empId, status: newStatus })
+                }).catch(err => console.error("Fast sync failed:", err));
                 
                 // Re-render calendar to update colors
                 renderCalendar();
@@ -754,10 +752,14 @@ function initApp() {
 
     function renderAdvanceViews() {
         if (selectEmpAdvance) {
-            selectEmpAdvance.innerHTML = '<option value="" disabled selected>Select Employee</option>';
-            employees.forEach(emp => {
-                selectEmpAdvance.insertAdjacentHTML('beforeend', `<option value="${emp.id}">${emp.name}</option>`);
-            });
+            if (selectEmpAdvance.options.length !== employees.length + 1) {
+                const currentValue = selectEmpAdvance.value;
+                selectEmpAdvance.innerHTML = '<option value="" disabled selected>Select Employee</option>';
+                employees.forEach(emp => {
+                    selectEmpAdvance.insertAdjacentHTML('beforeend', `<option value="${emp.id}">${emp.name}</option>`);
+                });
+                if (currentValue) selectEmpAdvance.value = currentValue;
+            }
         }
         
         const balancesBody = document.getElementById('advance-balances-body');
