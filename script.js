@@ -1,5 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
 import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAmCV-13jfhrKqVXHenIuBu0Hi7dr8919U",
@@ -12,9 +13,12 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
 // Database sync via Firebase
 let isStorageReady = false;
+let currentUserEmail = null;
+let firebaseUnsubscribe = null;
 
 const originalSetItem = localStorage.setItem;
 localStorage.setItem = function(key, value) {
@@ -36,6 +40,7 @@ function syncToFirebase() {
     if (syncTimeout) clearTimeout(syncTimeout);
     const syncId = ++currentSyncId;
     syncTimeout = setTimeout(async () => {
+        if (!currentUserEmail) return;
         isSyncing = true;
         try {
             const employeesList = JSON.parse(localStorage.getItem('employeesList') || '[]');
@@ -43,7 +48,7 @@ function syncToFirebase() {
             const advanceBalances = JSON.parse(localStorage.getItem('advanceBalances') || '{}');
             const advanceHistory = JSON.parse(localStorage.getItem('advanceHistory') || '[]');
 
-            await setDoc(doc(db, "bellad_data", "main"), {
+            await setDoc(doc(db, "bellad_data", currentUserEmail), {
                 employeesList,
                 bulkAttendance,
                 advanceBalances,
@@ -63,7 +68,89 @@ function syncToFirebase() {
 }
 
 function initApp() {
+    // --- Auth Logic ---
+    const authOverlay = document.getElementById('auth-overlay');
+    const authEmail = document.getElementById('auth-email');
+    const authPassword = document.getElementById('auth-password');
+    const authLoginBtn = document.getElementById('auth-login-btn');
+    const authSignupBtn = document.getElementById('auth-signup-btn');
+    const authError = document.getElementById('auth-error');
+    const btnLogout = document.getElementById('btn-logout');
 
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            currentUserEmail = user.email;
+            if (authOverlay) authOverlay.style.display = 'none';
+            setupFirebaseListener();
+        } else {
+            currentUserEmail = null;
+            if (firebaseUnsubscribe) firebaseUnsubscribe();
+            if (authOverlay) authOverlay.style.display = 'flex';
+            
+            // Clear local state
+            isStorageReady = false;
+            employees = [];
+            bulkAttendanceData = {};
+            advanceBalances = {};
+            advanceHistory = [];
+            originalRemoveItem.call(localStorage, 'employeesList');
+            originalRemoveItem.call(localStorage, 'bulkAttendance');
+            originalRemoveItem.call(localStorage, 'advanceBalances');
+            originalRemoveItem.call(localStorage, 'advanceHistory');
+            
+            // Re-render UI components empty
+            if (typeof renderCalendar === 'function') renderCalendar();
+            if (typeof renderDailyAttendance === 'function') renderDailyAttendance();
+            if (typeof renderSalaryTable === 'function') renderSalaryTable();
+            if (typeof renderAdvanceViews === 'function') renderAdvanceViews();
+            if (typeof renderDashboard === 'function') renderDashboard();
+        }
+    });
+
+    if (authLoginBtn) {
+        authLoginBtn.addEventListener('click', async () => {
+            const email = authEmail.value;
+            const password = authPassword.value;
+            if (!email || !password) return (authError.textContent = "Email and password required", authError.style.display = 'block');
+            
+            authError.style.display = 'none';
+            authLoginBtn.textContent = 'Logging in...';
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                authLoginBtn.textContent = 'Login';
+            } catch (error) {
+                authError.textContent = error.message;
+                authError.style.display = 'block';
+                authLoginBtn.textContent = 'Login';
+            }
+        });
+    }
+
+    if (authSignupBtn) {
+        authSignupBtn.addEventListener('click', async () => {
+            const email = authEmail.value;
+            const password = authPassword.value;
+            if (!email || !password) return (authError.textContent = "Email and password required", authError.style.display = 'block');
+            
+            authError.style.display = 'none';
+            authSignupBtn.textContent = 'Signing up...';
+            try {
+                await createUserWithEmailAndPassword(auth, email, password);
+                authSignupBtn.textContent = 'Sign Up';
+            } catch (error) {
+                authError.textContent = error.message;
+                authError.style.display = 'block';
+                authSignupBtn.textContent = 'Sign Up';
+            }
+        });
+    }
+
+    if (btnLogout) {
+        btnLogout.addEventListener('click', async (e) => {
+            e.preventDefault();
+            await signOut(auth);
+        });
+    }
 
     // Set current date on Dashboard
     const dateElement = document.getElementById('current-date');
@@ -81,18 +168,17 @@ function initApp() {
         { id: 'emp_04', name: 'Sneha Joshi', initial: 'SJ', bg: 'bg-green', role: 'Accountant', salaryType: 'monthly', salaryAmount: 45000 }
     ];
 
-    let employees = JSON.parse(localStorage.getItem('employeesList'));
-    if (!employees || employees.length === 0) {
-        employees = defaultEmployees;
-        originalSetItem.call(localStorage, 'employeesList', JSON.stringify(employees));
-    }
+    let employees = JSON.parse(localStorage.getItem('employeesList')) || [];
 
     let bulkAttendanceData = JSON.parse(localStorage.getItem('bulkAttendance')) || {};
     let advanceBalances = JSON.parse(localStorage.getItem('advanceBalances')) || {};
     let advanceHistory = JSON.parse(localStorage.getItem('advanceHistory')) || [];
 
     function setupFirebaseListener() {
-        onSnapshot(doc(db, "bellad_data", "main"), (docSnap) => {
+        if (firebaseUnsubscribe) firebaseUnsubscribe();
+        if (!currentUserEmail) return;
+
+        firebaseUnsubscribe = onSnapshot(doc(db, "bellad_data", currentUserEmail), (docSnap) => {
             if (isSyncing || syncTimeout) return; // Don't override if we are actively syncing local changes
             
             isStorageReady = false;
@@ -127,6 +213,10 @@ function initApp() {
                 if (typeof renderEmployeeGrid === 'function' && document.getElementById('employees').classList.contains('active')) renderEmployeeGrid();
             } else {
                 // If DB is empty, push our local default employees up
+                if (employees.length === 0) {
+                    employees = defaultEmployees;
+                    originalSetItem.call(localStorage, 'employeesList', JSON.stringify(employees));
+                }
                 syncToFirebase();
             }
             isStorageReady = true;
@@ -135,9 +225,6 @@ function initApp() {
             isStorageReady = true;
         });
     }
-
-    // Initialize data listener
-    setupFirebaseListener();
 
 
     // Handle SPA navigation
