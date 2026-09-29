@@ -1,23 +1,38 @@
-// Database sync via backend API
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAmCV-13jfhrKqVXHenIuBu0Hi7dr8919U",
+  authDomain: "studio-7358096966-b0c4c.firebaseapp.com",
+  projectId: "studio-7358096966-b0c4c",
+  storageBucket: "studio-7358096966-b0c4c.firebasestorage.app",
+  messagingSenderId: "466891682067",
+  appId: "1:466891682067:web:039f9ea3b09af3a9206ae6"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// Database sync via Firebase
 let isStorageReady = false;
 
 const originalSetItem = localStorage.setItem;
 localStorage.setItem = function(key, value) {
     originalSetItem.call(localStorage, key, value);
-    if (isStorageReady) syncToNeon();
+    if (isStorageReady) syncToFirebase();
 };
 
 const originalRemoveItem = localStorage.removeItem;
 localStorage.removeItem = function(key) {
     originalRemoveItem.call(localStorage, key);
-    if (isStorageReady) syncToNeon();
+    if (isStorageReady) syncToFirebase();
 };
 
 let syncTimeout = null;
 let isSyncing = false;
 let currentSyncId = 0;
 
-function syncToNeon() {
+function syncToFirebase() {
     if (syncTimeout) clearTimeout(syncTimeout);
     const syncId = ++currentSyncId;
     syncTimeout = setTimeout(async () => {
@@ -28,144 +43,59 @@ function syncToNeon() {
             const advanceBalances = JSON.parse(localStorage.getItem('advanceBalances') || '{}');
             const advanceHistory = JSON.parse(localStorage.getItem('advanceHistory') || '[]');
 
-            const response = await fetch('/api/data', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'X-User-Email': sessionStorage.getItem('bellad_user_email')
-                },
-                body: JSON.stringify({
-                    employeesList,
-                    bulkAttendance,
-                    advanceBalances,
-                    advanceHistory
-                })
+            await setDoc(doc(db, "bellad_data", "main"), {
+                employeesList,
+                bulkAttendance,
+                advanceBalances,
+                advanceHistory
             });
 
-            if (!response.ok) throw new Error("Failed to sync to backend");
-
-            console.log("Successfully synced to Backend API");
+            console.log("Successfully synced to Firebase");
         } catch (err) {
-            console.error("Error syncing to Backend:", err);
+            console.error("Error syncing to Firebase:", err);
         } finally {
             if (currentSyncId === syncId) {
                 syncTimeout = null;
                 isSyncing = false;
             }
         }
-    }, 300);
+    }, 500);
 }
 
 function initApp() {
     // --- Auth Logic ---
-    const supabaseUrl = 'https://abnjfxcfgvlonamabclk.supabase.co';
-    const supabaseKey = 'sb_publishable_aLOnfv0E1pU3m1_a9xJ9pQ_rcCwLaRE';
-    const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
-
     const authOverlay = document.getElementById('auth-overlay');
-    const authEmail = document.getElementById('auth-email-input');
-    const authPassword = document.getElementById('auth-password-input');
-    const btnLogin = document.getElementById('auth-login-btn');
-    const btnSignup = document.getElementById('auth-signup-btn');
+    const authInput = document.getElementById('auth-pin-input');
+    const authBtn = document.getElementById('auth-pin-btn');
     const authError = document.getElementById('auth-error');
-    const authMsg = document.getElementById('auth-msg');
-
-    async function checkUser() {
-        const email = sessionStorage.getItem('bellad_user_email');
-        if (email) {
-            authOverlay.style.display = 'none';
-            fetchFromNeon(true); // Load data after auth
-            return true;
-        }
-        authOverlay.style.display = 'flex';
-        return false;
-    }
 
     if (authOverlay) {
-        checkUser();
-
-        btnLogin.addEventListener('click', async () => {
-            const email = authEmail.value;
-            const password = authPassword.value;
-            if (!email || !password) return showAuthError("Email and password required.");
-            
-            authError.style.display = 'none';
-            authMsg.style.display = 'block';
-            authMsg.style.color = '#3b82f6';
-            authMsg.textContent = "Logging in...";
-
-            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-            if (error) {
-                showAuthError(error.message);
-            } else {
-                sessionStorage.setItem('bellad_user_email', email);
-                authOverlay.style.display = 'none';
-                fetchFromNeon(true);
-            }
-        });
-
-        btnSignup.addEventListener('click', async () => {
-            const email = authEmail.value;
-            const password = authPassword.value;
-            if (!email || !password) return showAuthError("Email and password required.");
-
-            authError.style.display = 'none';
-            authMsg.style.display = 'block';
-            authMsg.style.color = '#3b82f6';
-            authMsg.textContent = "Creating account...";
-
-            const { data, error } = await supabaseClient.auth.signUp({ email, password });
-            if (error) {
-                showAuthError(error.message);
-            } else {
-                authMsg.style.display = 'none';
-                sessionStorage.setItem('bellad_user_email', email);
-                authOverlay.style.display = 'none';
-                fetchFromNeon(true);
-            }
-        });
-    }
-
-    function showAuthError(msg) {
-        authMsg.style.display = 'none';
-        authError.style.display = 'block';
-        authError.textContent = msg;
-    }
-
-    const btnLogout = document.getElementById('btn-logout');
-    if (btnLogout) {
-        btnLogout.addEventListener('click', async (e) => {
-            e.preventDefault();
-            await supabaseClient.auth.signOut();
-            
-            // Clear session and local storage
-            sessionStorage.removeItem('bellad_user_email');
-            localStorage.removeItem('employeesList');
-            localStorage.removeItem('bulkAttendance');
-            localStorage.removeItem('advanceBalances');
-            localStorage.removeItem('advanceHistory');
-            
-            // Clear in-memory variables
-            employees = [];
-            bulkAttendanceData = {};
-            advanceBalances = {};
-            advanceHistory = [];
-            
-            // Re-render UI empty
-            if (typeof renderCalendar === 'function') renderCalendar();
-            if (typeof renderDailyAttendance === 'function') renderDailyAttendance();
-            if (typeof renderSalaryTable === 'function') renderSalaryTable();
-            if (typeof renderAdvanceViews === 'function') renderAdvanceViews();
-            if (typeof renderDashboard === 'function') renderDashboard();
-            if (typeof renderEmployeeGrid === 'function') renderEmployeeGrid();
-
-            // Show auth overlay
-            authEmail.value = '';
-            authPassword.value = '';
-            authError.style.display = 'none';
-            authMsg.style.display = 'none';
+        const isAuth = sessionStorage.getItem('bellad_auth');
+        if (isAuth === 'true') {
+            authOverlay.style.display = 'none';
+        } else {
             authOverlay.style.display = 'flex';
-        });
+            
+            const checkPin = () => {
+                if (authInput.value === '1919') {
+                    sessionStorage.setItem('bellad_auth', 'true');
+                    authOverlay.style.transition = 'opacity 0.3s ease';
+                    authOverlay.style.opacity = '0';
+                    setTimeout(() => {
+                        authOverlay.style.display = 'none';
+                    }, 300);
+                } else {
+                    authError.style.display = 'block';
+                    authInput.value = '';
+                    authInput.focus();
+                }
+            };
+            
+            authBtn.addEventListener('click', checkPin);
+            authInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') checkPin();
+            });
+        }
     }
 
     // Set current date on Dashboard
@@ -194,49 +124,31 @@ function initApp() {
     let advanceBalances = JSON.parse(localStorage.getItem('advanceBalances')) || {};
     let advanceHistory = JSON.parse(localStorage.getItem('advanceHistory')) || [];
 
-    async function fetchFromNeon(isInitialLoad = false) {
-        // Don't poll if we are actively syncing local changes outward
-        if (!isInitialLoad && (isSyncing || syncTimeout)) return;
-        
-        isStorageReady = false;
-        try {
-            const response = await fetch('/api/data', { 
-                cache: 'no-store',
-                headers: { 'X-User-Email': sessionStorage.getItem('bellad_user_email') }
-            });
-            if (!response.ok) throw new Error("Failed to fetch from backend");
-            const data = await response.json();
+    function setupFirebaseListener() {
+        onSnapshot(doc(db, "bellad_data", "main"), (docSnap) => {
+            if (isSyncing || syncTimeout) return; // Don't override if we are actively syncing local changes
             
-            const dbEmployees = data.employees || [];
-            const dbAttendance = data.attendance || [];
-            const dbAdvHistory = data.advanceHistory || [];
-            const dbAdvBalances = data.advanceBalances || [];
+            isStorageReady = false;
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                
+                const dbEmployees = data.employeesList || [];
+                const dbAttendance = data.bulkAttendance || {};
+                const dbAdvBalances = data.advanceBalances || {};
+                const dbAdvHistory = data.advanceHistory || [];
 
-            if (dbEmployees.length > 0 || !isInitialLoad) {
                 if (dbEmployees.length > 0) {
-                    employees = dbEmployees.map(row => ({
-                        id: row.id, name: row.name, initial: row.initial, bg: row.bg, 
-                        role: row.role, salaryType: row.salarytype, salaryAmount: Number(row.salaryamount)
-                    }));
+                    employees = dbEmployees;
                     originalSetItem.call(localStorage, 'employeesList', JSON.stringify(employees));
                 }
                 
-                bulkAttendanceData = {};
-                for (const row of dbAttendance) {
-                    if (!bulkAttendanceData[row.date]) bulkAttendanceData[row.date] = {};
-                    bulkAttendanceData[row.date][row.employee_id] = row.status;
-                }
+                bulkAttendanceData = dbAttendance;
                 originalSetItem.call(localStorage, 'bulkAttendance', JSON.stringify(bulkAttendanceData));
 
-                advanceBalances = {};
-                for (const row of dbAdvBalances) {
-                    advanceBalances[row.empid] = Number(row.balance);
-                }
+                advanceBalances = dbAdvBalances;
                 originalSetItem.call(localStorage, 'advanceBalances', JSON.stringify(advanceBalances));
 
-                advanceHistory = dbAdvHistory.map(row => ({
-                    empId: row.empid, amount: Number(row.amount), date: row.date
-                }));
+                advanceHistory = dbAdvHistory;
                 originalSetItem.call(localStorage, 'advanceHistory', JSON.stringify(advanceHistory));
 
                 // Re-render UI components
@@ -247,21 +159,18 @@ function initApp() {
                 if (typeof renderDashboard === 'function') renderDashboard();
                 if (typeof renderEmployeeGrid === 'function' && document.getElementById('employees').classList.contains('active')) renderEmployeeGrid();
             } else {
-                // If initial load and DB is empty, push our local default employees up
-                syncToNeon();
+                // If DB is empty, push our local default employees up
+                syncToFirebase();
             }
-        } catch (err) {
-            console.error("Backend API Fetch Error:", err);
-        } finally {
             isStorageReady = true;
-        }
+        }, (error) => {
+            console.error("Firebase Snapshot Error:", error);
+            isStorageReady = true;
+        });
     }
 
-    // Initialize data
-    fetchFromNeon(true);
-    
-    // Setup polling every 1.5 seconds for real-time multi-device sync
-    setInterval(() => fetchFromNeon(false), 1500);
+    // Initialize data listener
+    setupFirebaseListener();
 
 
     // Handle SPA navigation
@@ -614,15 +523,8 @@ function initApp() {
                 // Save locally but bypass the heavy bulk sync hook
                 originalSetItem.call(localStorage, 'bulkAttendance', JSON.stringify(bulkAttendanceData));
                 
-                // Fast path sync to backend
-                fetch('/api/mark-attendance', {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'X-User-Email': sessionStorage.getItem('bellad_user_email')
-                    },
-                    body: JSON.stringify({ date: selectedDate, empId, status: newStatus })
-                }).catch(err => console.error("Fast sync failed:", err));
+                // Trigger Firebase sync
+                syncToFirebase();
                 
                 // Re-render calendar to update colors
                 renderCalendar();
