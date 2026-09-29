@@ -121,7 +121,7 @@ function initApp() {
         
         isStorageReady = false;
         try {
-            const response = await fetch('/api/data');
+            const response = await fetch('/api/data', { cache: 'no-store' });
             if (!response.ok) throw new Error("Failed to fetch from backend");
             const data = await response.json();
             
