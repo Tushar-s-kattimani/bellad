@@ -63,40 +63,7 @@ function syncToFirebase() {
 }
 
 function initApp() {
-    // --- Auth Logic ---
-    const authOverlay = document.getElementById('auth-overlay');
-    const authInput = document.getElementById('auth-pin-input');
-    const authBtn = document.getElementById('auth-pin-btn');
-    const authError = document.getElementById('auth-error');
 
-    if (authOverlay) {
-        const isAuth = sessionStorage.getItem('bellad_auth');
-        if (isAuth === 'true') {
-            authOverlay.style.display = 'none';
-        } else {
-            authOverlay.style.display = 'flex';
-            
-            const checkPin = () => {
-                if (authInput.value === '1919') {
-                    sessionStorage.setItem('bellad_auth', 'true');
-                    authOverlay.style.transition = 'opacity 0.3s ease';
-                    authOverlay.style.opacity = '0';
-                    setTimeout(() => {
-                        authOverlay.style.display = 'none';
-                    }, 300);
-                } else {
-                    authError.style.display = 'block';
-                    authInput.value = '';
-                    authInput.focus();
-                }
-            };
-            
-            authBtn.addEventListener('click', checkPin);
-            authInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') checkPin();
-            });
-        }
-    }
 
     // Set current date on Dashboard
     const dateElement = document.getElementById('current-date');
