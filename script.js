@@ -18,19 +18,11 @@ const auth = getAuth(app);
 // Database sync via Firebase
 let isStorageReady = false;
 let currentUserEmail = null;
+let employees = [];
+let bulkAttendanceData = {};
+let advanceBalances = {};
+let advanceHistory = [];
 let firebaseUnsubscribe = null;
-
-const originalSetItem = localStorage.setItem;
-localStorage.setItem = function(key, value) {
-    originalSetItem.call(localStorage, key, value);
-    if (isStorageReady) syncToFirebase();
-};
-
-const originalRemoveItem = localStorage.removeItem;
-localStorage.removeItem = function(key) {
-    originalRemoveItem.call(localStorage, key);
-    if (isStorageReady) syncToFirebase();
-};
 
 let syncTimeout = null;
 let isSyncing = false;
@@ -43,18 +35,12 @@ function syncToFirebase() {
         if (!currentUserEmail) return;
         isSyncing = true;
         try {
-            const employeesList = JSON.parse(localStorage.getItem('employeesList') || '[]');
-            const bulkAttendance = JSON.parse(localStorage.getItem('bulkAttendance') || '{}');
-            const advanceBalances = JSON.parse(localStorage.getItem('advanceBalances') || '{}');
-            const advanceHistory = JSON.parse(localStorage.getItem('advanceHistory') || '[]');
-
             await setDoc(doc(db, "bellad_data", currentUserEmail), {
-                employeesList,
-                bulkAttendance,
-                advanceBalances,
-                advanceHistory
+                employeesList: employees,
+                bulkAttendance: bulkAttendanceData,
+                advanceBalances: advanceBalances,
+                advanceHistory: advanceHistory
             });
-
             console.log("Successfully synced to Firebase");
         } catch (err) {
             console.error("Error syncing to Firebase:", err);
@@ -93,11 +79,6 @@ function initApp() {
             bulkAttendanceData = {};
             advanceBalances = {};
             advanceHistory = [];
-            originalRemoveItem.call(localStorage, 'employeesList');
-            originalRemoveItem.call(localStorage, 'bulkAttendance');
-            originalRemoveItem.call(localStorage, 'advanceBalances');
-            originalRemoveItem.call(localStorage, 'advanceHistory');
-            
             // Re-render UI components empty
             if (typeof renderCalendar === 'function') renderCalendar();
             if (typeof renderDailyAttendance === 'function') renderDailyAttendance();
@@ -168,11 +149,11 @@ function initApp() {
         { id: 'emp_04', name: 'Sneha Joshi', initial: 'SJ', bg: 'bg-green', role: 'Accountant', salaryType: 'monthly', salaryAmount: 45000 }
     ];
 
-    let employees = JSON.parse(localStorage.getItem('employeesList')) || [];
+    
 
-    let bulkAttendanceData = JSON.parse(localStorage.getItem('bulkAttendance')) || {};
-    let advanceBalances = JSON.parse(localStorage.getItem('advanceBalances')) || {};
-    let advanceHistory = JSON.parse(localStorage.getItem('advanceHistory')) || [];
+    
+    
+    
 
     function setupFirebaseListener() {
         if (firebaseUnsubscribe) firebaseUnsubscribe();
@@ -192,17 +173,11 @@ function initApp() {
 
                 if (dbEmployees.length > 0) {
                     employees = dbEmployees;
-                    originalSetItem.call(localStorage, 'employeesList', JSON.stringify(employees));
                 }
                 
                 bulkAttendanceData = dbAttendance;
-                originalSetItem.call(localStorage, 'bulkAttendance', JSON.stringify(bulkAttendanceData));
-
                 advanceBalances = dbAdvBalances;
-                originalSetItem.call(localStorage, 'advanceBalances', JSON.stringify(advanceBalances));
-
                 advanceHistory = dbAdvHistory;
-                originalSetItem.call(localStorage, 'advanceHistory', JSON.stringify(advanceHistory));
 
                 // Re-render UI components
                 if (typeof renderCalendar === 'function') renderCalendar();
@@ -215,7 +190,7 @@ function initApp() {
                 // If DB is empty, push our local default employees up
                 if (employees.length === 0) {
                     employees = defaultEmployees;
-                    originalSetItem.call(localStorage, 'employeesList', JSON.stringify(employees));
+                    syncToFirebase();
                 }
                 syncToFirebase();
             }
@@ -348,7 +323,7 @@ function initApp() {
                 // update initials just in case name changed
                 employees[empIndex].initial = employees[empIndex].name.split(' ').map(n=>n[0]).join('').toUpperCase();
                 
-                localStorage.setItem('employeesList', JSON.stringify(employees));
+                syncToFirebase();
                 renderEmployeeGrid();
                 
                 if (typeof renderDailyAttendance === 'function') renderDailyAttendance();
@@ -386,7 +361,7 @@ function initApp() {
             const newEmp = { id, name, initial, bg, role, salaryType, salaryAmount };
             employees.push(newEmp);
             
-            localStorage.setItem('employeesList', JSON.stringify(employees));
+            syncToFirebase();
             renderEmployeeGrid();
             
             if (typeof renderDailyAttendance === 'function') renderDailyAttendance();
@@ -575,7 +550,7 @@ function initApp() {
                 bulkAttendanceData[selectedDate][empId] = newStatus;
                 
                 // Save locally but bypass the heavy bulk sync hook
-                originalSetItem.call(localStorage, 'bulkAttendance', JSON.stringify(bulkAttendanceData));
+                syncToFirebase();
                 
                 // Trigger Firebase sync
                 syncToFirebase();
@@ -706,7 +681,7 @@ function initApp() {
             
             // Advance Deduction Logic
             // Make sure advanceBalances is accessible here
-            const allAdvances = JSON.parse(localStorage.getItem('advanceBalances')) || {};
+            const allAdvances = advanceBalances;
             const advanceBalance = allAdvances[emp.id] || 0;
             let deduction = 0;
             let remainingAdvance = advanceBalance;
@@ -858,8 +833,8 @@ function initApp() {
                 date: todayStr
             });
             
-            localStorage.setItem('advanceBalances', JSON.stringify(advanceBalances));
-            localStorage.setItem('advanceHistory', JSON.stringify(advanceHistory));
+            syncToFirebase();
+            syncToFirebase();
             
             inputAdvanceAmt.value = '';
             selectEmpAdvance.value = '';
@@ -968,9 +943,9 @@ function initApp() {
                 advanceHistory = [];
                 
                 // Clear from LocalStorage
-                localStorage.removeItem('bulkAttendance');
-                localStorage.removeItem('advanceBalances');
-                localStorage.removeItem('advanceHistory');
+                
+                
+                
                 
                 // Re-render UI components
                 if (typeof renderCalendar === 'function') renderCalendar();
