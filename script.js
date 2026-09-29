@@ -30,7 +30,10 @@ function syncToNeon() {
 
             const response = await fetch('/api/data', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-User-Email': sessionStorage.getItem('bellad_user_email')
+                },
                 body: JSON.stringify({
                     employeesList,
                     bulkAttendance,
@@ -55,38 +58,114 @@ function syncToNeon() {
 
 function initApp() {
     // --- Auth Logic ---
+    const supabaseUrl = 'https://abnjfxcfgvlonamabclk.supabase.co';
+    const supabaseKey = 'sb_publishable_aLOnfv0E1pU3m1_a9xJ9pQ_rcCwLaRE';
+    const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+
     const authOverlay = document.getElementById('auth-overlay');
-    const authInput = document.getElementById('auth-pin-input');
-    const authBtn = document.getElementById('auth-pin-btn');
+    const authEmail = document.getElementById('auth-email-input');
+    const authPassword = document.getElementById('auth-password-input');
+    const btnLogin = document.getElementById('auth-login-btn');
+    const btnSignup = document.getElementById('auth-signup-btn');
     const authError = document.getElementById('auth-error');
+    const authMsg = document.getElementById('auth-msg');
+
+    async function checkUser() {
+        const email = sessionStorage.getItem('bellad_user_email');
+        if (email) {
+            authOverlay.style.display = 'none';
+            fetchFromNeon(true); // Load data after auth
+            return true;
+        }
+        authOverlay.style.display = 'flex';
+        return false;
+    }
 
     if (authOverlay) {
-        const isAuth = sessionStorage.getItem('bellad_auth');
-        if (isAuth === 'true') {
-            authOverlay.style.display = 'none';
-        } else {
+        checkUser();
+
+        btnLogin.addEventListener('click', async () => {
+            const email = authEmail.value;
+            const password = authPassword.value;
+            if (!email || !password) return showAuthError("Email and password required.");
+            
+            authError.style.display = 'none';
+            authMsg.style.display = 'block';
+            authMsg.style.color = '#3b82f6';
+            authMsg.textContent = "Logging in...";
+
+            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) {
+                showAuthError(error.message);
+            } else {
+                sessionStorage.setItem('bellad_user_email', email);
+                authOverlay.style.display = 'none';
+                fetchFromNeon(true);
+            }
+        });
+
+        btnSignup.addEventListener('click', async () => {
+            const email = authEmail.value;
+            const password = authPassword.value;
+            if (!email || !password) return showAuthError("Email and password required.");
+
+            authError.style.display = 'none';
+            authMsg.style.display = 'block';
+            authMsg.style.color = '#3b82f6';
+            authMsg.textContent = "Creating account...";
+
+            const { data, error } = await supabaseClient.auth.signUp({ email, password });
+            if (error) {
+                showAuthError(error.message);
+            } else {
+                authMsg.style.display = 'none';
+                sessionStorage.setItem('bellad_user_email', email);
+                authOverlay.style.display = 'none';
+                fetchFromNeon(true);
+            }
+        });
+    }
+
+    function showAuthError(msg) {
+        authMsg.style.display = 'none';
+        authError.style.display = 'block';
+        authError.textContent = msg;
+    }
+
+    const btnLogout = document.getElementById('btn-logout');
+    if (btnLogout) {
+        btnLogout.addEventListener('click', async (e) => {
+            e.preventDefault();
+            await supabaseClient.auth.signOut();
+            
+            // Clear session and local storage
+            sessionStorage.removeItem('bellad_user_email');
+            localStorage.removeItem('employeesList');
+            localStorage.removeItem('bulkAttendance');
+            localStorage.removeItem('advanceBalances');
+            localStorage.removeItem('advanceHistory');
+            
+            // Clear in-memory variables
+            employees = [];
+            bulkAttendanceData = {};
+            advanceBalances = {};
+            advanceHistory = [];
+            
+            // Re-render UI empty
+            if (typeof renderCalendar === 'function') renderCalendar();
+            if (typeof renderDailyAttendance === 'function') renderDailyAttendance();
+            if (typeof renderSalaryTable === 'function') renderSalaryTable();
+            if (typeof renderAdvanceViews === 'function') renderAdvanceViews();
+            if (typeof renderDashboard === 'function') renderDashboard();
+            if (typeof renderEmployeeGrid === 'function') renderEmployeeGrid();
+
+            // Show auth overlay
+            authEmail.value = '';
+            authPassword.value = '';
+            authError.style.display = 'none';
+            authMsg.style.display = 'none';
             authOverlay.style.display = 'flex';
-            
-            const checkPin = () => {
-                if (authInput.value === '1919') {
-                    sessionStorage.setItem('bellad_auth', 'true');
-                    authOverlay.style.transition = 'opacity 0.3s ease';
-                    authOverlay.style.opacity = '0';
-                    setTimeout(() => {
-                        authOverlay.style.display = 'none';
-                    }, 300);
-                } else {
-                    authError.style.display = 'block';
-                    authInput.value = '';
-                    authInput.focus();
-                }
-            };
-            
-            authBtn.addEventListener('click', checkPin);
-            authInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') checkPin();
-            });
-        }
+        });
     }
 
     // Set current date on Dashboard
@@ -121,7 +200,10 @@ function initApp() {
         
         isStorageReady = false;
         try {
-            const response = await fetch('/api/data', { cache: 'no-store' });
+            const response = await fetch('/api/data', { 
+                cache: 'no-store',
+                headers: { 'X-User-Email': sessionStorage.getItem('bellad_user_email') }
+            });
             if (!response.ok) throw new Error("Failed to fetch from backend");
             const data = await response.json();
             
@@ -535,7 +617,10 @@ function initApp() {
                 // Fast path sync to backend
                 fetch('/api/mark-attendance', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-User-Email': sessionStorage.getItem('bellad_user_email')
+                    },
                     body: JSON.stringify({ date: selectedDate, empId, status: newStatus })
                 }).catch(err => console.error("Fast sync failed:", err));
                 
