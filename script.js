@@ -553,6 +553,17 @@ function initApp() {
     function getDaysInMonth(year, month) {
         return new Date(year, month, 0).getDate();
     }
+    
+    function convertToYYYYMM(dateStr) {
+        if (!dateStr) return "";
+        if (dateStr.includes('-') && dateStr.length >= 7) return dateStr.substring(0, 7);
+        const parts = dateStr.split(' ');
+        if (parts.length === 3) {
+            const months = { 'Jan':'01', 'Feb':'02', 'Mar':'03', 'Apr':'04', 'May':'05', 'Jun':'06', 'Jul':'07', 'Aug':'08', 'Sep':'09', 'Oct':'10', 'Nov':'11', 'Dec':'12' };
+            return `${parts[2]}-${months[parts[1]] || '01'}`;
+        }
+        return dateStr;
+    }
 
     function getEmployeeMonthFinancials(empId, targetMonthStr) {
         const monthsSet = new Set();
@@ -562,8 +573,8 @@ function initApp() {
         });
         advanceHistory.forEach(adv => {
             if (adv.empId === empId) {
-                const m = adv.date.substring(0, 7);
-                if (m <= targetMonthStr) monthsSet.add(m);
+                const m = convertToYYYYMM(adv.date);
+                if (m && m <= targetMonthStr) monthsSet.add(m);
             }
         });
         monthsSet.add(targetMonthStr);
@@ -593,7 +604,7 @@ function initApp() {
             
             let advanceGiven = 0;
             advanceHistory.forEach(a => {
-                if (a.empId === empId && a.date.startsWith(mStr)) {
+                if (a.empId === empId && convertToYYYYMM(a.date) === mStr) {
                     advanceGiven += a.amount;
                 }
             });
