@@ -665,6 +665,38 @@ function initApp() {
         salaryMonthPicker.addEventListener('change', renderSalaryTable);
     }
     
+    // PDF Download Logic
+    const btnDownloadPdf = document.getElementById('btn-download-pdf');
+    if (btnDownloadPdf) {
+        btnDownloadPdf.addEventListener('click', () => {
+            const element = document.getElementById('salary-report-content');
+            if (element) {
+                const opt = {
+                    margin:       0.5,
+                    filename:     `Salary_Payout_${salaryMonthPicker ? salaryMonthPicker.value : 'Report'}.pdf`,
+                    image:        { type: 'jpeg', quality: 0.98 },
+                    html2canvas:  { scale: 2 },
+                    jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+                };
+                
+                // Optional: add loading state to button
+                const originalHtml = btnDownloadPdf.innerHTML;
+                btnDownloadPdf.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
+                btnDownloadPdf.disabled = true;
+                
+                html2pdf().set(opt).from(element).save().then(() => {
+                    btnDownloadPdf.innerHTML = originalHtml;
+                    btnDownloadPdf.disabled = false;
+                }).catch(err => {
+                    console.error('PDF Generation Error:', err);
+                    btnDownloadPdf.innerHTML = originalHtml;
+                    btnDownloadPdf.disabled = false;
+                    alert('Error generating PDF. Please try again.');
+                });
+            }
+        });
+    }
+    
     // --- Advances Logic ---
 
     const tabBalances = document.getElementById('tab-advances-balances');

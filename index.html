@@ -196,12 +196,14 @@
                             <h2>Salary & Payroll</h2>
                             <p>Manage compensation for <span id="salary-month-display">September 2026</span></p>
                         </div>
-                        <div class="action-group" style="align-items: center;">
+                        <div class="action-group" style="align-items: center; gap: 10px;">
                             <input type="month" id="salary-month-picker" class="form-control" style="width: auto; padding: 6px 12px;">
+                            <button id="btn-download-pdf" class="btn btn-secondary"><i class="fa-solid fa-file-pdf"></i> Download PDF</button>
                         </div>
                     </div>
 
-                    <div class="salary-banner" style="background-color: #03488f; color: white; padding: 25px 30px; border-radius: 8px; margin-bottom: 20px;">
+                    <div id="salary-report-content">
+                        <div class="salary-banner" style="background-color: #03488f; color: white; padding: 25px 30px; border-radius: 8px; margin-bottom: 20px;">
                         <p style="margin: 0; font-size: 16px; font-weight: 500;">Total Estimated Payout</p>
                         <h2 id="total-estimated-payout" style="margin: 8px 0 0 0; font-size: 36px; font-weight: 700;">₹0.00</h2>
                     </div>
@@ -224,6 +226,7 @@
                                 </tbody>
                             </table>
                         </div>
+                    </div>
                     </div>
                 </section>
 
@@ -436,6 +439,7 @@
         </div>
 
     </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script type="module" src="script.js?v=2"></script>
 </body>
 </html>
