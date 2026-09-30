@@ -1,49 +1,38 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyAmCV-13jfhrKqVXHenIuBu0Hi7dr8919U",
-  authDomain: "studio-7358096966-b0c4c.firebaseapp.com",
-  projectId: "studio-7358096966-b0c4c",
-  storageBucket: "studio-7358096966-b0c4c.firebasestorage.app",
-  messagingSenderId: "466891682067",
-  appId: "1:466891682067:web:039f9ea3b09af3a9206ae6"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
 
 // Database sync via Firebase
 let isStorageReady = false;
-let currentUserEmail = null;
+let currentUserEmail = "public@bellad.com";
 let employees = [];
 let bulkAttendanceData = {};
 let advanceBalances = {};
 let advanceHistory = [];
-let firebaseUnsubscribe = null;
 
 let syncTimeout = null;
 let isSyncing = false;
 let currentSyncId = 0;
 
-function syncToFirebase() {
+function syncToServer() {
     if (syncTimeout) clearTimeout(syncTimeout);
     const syncId = ++currentSyncId;
     syncTimeout = setTimeout(async () => {
         if (!currentUserEmail) return;
         isSyncing = true;
         try {
-            await setDoc(doc(db, "bellad_data", currentUserEmail), {
-                employeesList: employees,
-                bulkAttendance: bulkAttendanceData,
-                advanceBalances: advanceBalances,
-                advanceHistory: advanceHistory
+            const response = await fetch(`/api/data/${encodeURIComponent(currentUserEmail)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    employeesList: employees,
+                    bulkAttendance: bulkAttendanceData,
+                    advanceBalances: advanceBalances,
+                    advanceHistory: advanceHistory
+                })
             });
-            console.log("Successfully synced to Firebase");
+            if (!response.ok) throw new Error('Failed to sync to server');
+            console.log("Successfully synced to Server");
         } catch (err) {
-            console.error("Error syncing to Firebase:", err);
+            console.error("Error syncing to Server:", err);
         } finally {
             if (currentSyncId === syncId) {
                 syncTimeout = null;
@@ -54,84 +43,8 @@ function syncToFirebase() {
 }
 
 function initApp() {
-    // --- Auth Logic ---
-    const authOverlay = document.getElementById('auth-overlay');
-    const authEmail = document.getElementById('auth-email');
-    const authPassword = document.getElementById('auth-password');
-    const authLoginBtn = document.getElementById('auth-login-btn');
-    const authSignupBtn = document.getElementById('auth-signup-btn');
-    const authError = document.getElementById('auth-error');
-    const btnLogout = document.getElementById('btn-logout');
-
-    onAuthStateChanged(auth, (user) => {
-        if (user) {
-            currentUserEmail = user.email;
-            if (authOverlay) authOverlay.style.display = 'none';
-            setupFirebaseListener();
-        } else {
-            currentUserEmail = null;
-            if (firebaseUnsubscribe) firebaseUnsubscribe();
-            if (authOverlay) authOverlay.style.display = 'flex';
-            
-            // Clear local state
-            isStorageReady = false;
-            employees = [];
-            bulkAttendanceData = {};
-            advanceBalances = {};
-            advanceHistory = [];
-            // Re-render UI components empty
-            if (typeof renderCalendar === 'function') renderCalendar();
-            if (typeof renderDailyAttendance === 'function') renderDailyAttendance();
-            if (typeof renderSalaryTable === 'function') renderSalaryTable();
-            if (typeof renderAdvanceViews === 'function') renderAdvanceViews();
-            if (typeof renderDashboard === 'function') renderDashboard();
-        }
-    });
-
-    if (authLoginBtn) {
-        authLoginBtn.addEventListener('click', async () => {
-            const email = authEmail.value;
-            const password = authPassword.value;
-            if (!email || !password) return (authError.textContent = "Email and password required", authError.style.display = 'block');
-            
-            authError.style.display = 'none';
-            authLoginBtn.textContent = 'Logging in...';
-            try {
-                await signInWithEmailAndPassword(auth, email, password);
-                authLoginBtn.textContent = 'Login';
-            } catch (error) {
-                authError.textContent = error.message;
-                authError.style.display = 'block';
-                authLoginBtn.textContent = 'Login';
-            }
-        });
-    }
-
-    if (authSignupBtn) {
-        authSignupBtn.addEventListener('click', async () => {
-            const email = authEmail.value;
-            const password = authPassword.value;
-            if (!email || !password) return (authError.textContent = "Email and password required", authError.style.display = 'block');
-            
-            authError.style.display = 'none';
-            authSignupBtn.textContent = 'Signing up...';
-            try {
-                await createUserWithEmailAndPassword(auth, email, password);
-                authSignupBtn.textContent = 'Sign Up';
-            } catch (error) {
-                authError.textContent = error.message;
-                authError.style.display = 'block';
-                authSignupBtn.textContent = 'Sign Up';
-            }
-        });
-    }
-
-    if (btnLogout) {
-        btnLogout.addEventListener('click', async (e) => {
-            e.preventDefault();
-            await signOut(auth);
-        });
-    }
+    // App loads data for public shared view
+    loadFromServer();
 
     // Set current date on Dashboard
     const dateElement = document.getElementById('current-date');
@@ -155,16 +68,14 @@ function initApp() {
     
     
 
-    function setupFirebaseListener() {
-        if (firebaseUnsubscribe) firebaseUnsubscribe();
+    async function loadFromServer() {
         if (!currentUserEmail) return;
 
-        firebaseUnsubscribe = onSnapshot(doc(db, "bellad_data", currentUserEmail), (docSnap) => {
-            if (isSyncing || syncTimeout) return; // Don't override if we are actively syncing local changes
-            
+        try {
             isStorageReady = false;
-            if (docSnap.exists()) {
-                const data = docSnap.data();
+            const response = await fetch(`/api/data/${encodeURIComponent(currentUserEmail)}`);
+            if (response.ok) {
+                const data = await response.json();
                 
                 const dbEmployees = data.employeesList || [];
                 const dbAttendance = data.bulkAttendance || {};
@@ -173,6 +84,9 @@ function initApp() {
 
                 if (dbEmployees.length > 0) {
                     employees = dbEmployees;
+                } else if (employees.length === 0) {
+                    employees = defaultEmployees;
+                    syncToServer();
                 }
                 
                 bulkAttendanceData = dbAttendance;
@@ -186,19 +100,12 @@ function initApp() {
                 if (typeof renderAdvanceViews === 'function') renderAdvanceViews();
                 if (typeof renderDashboard === 'function') renderDashboard();
                 if (typeof renderEmployeeGrid === 'function' && document.getElementById('employees').classList.contains('active')) renderEmployeeGrid();
-            } else {
-                // If DB is empty, push our local default employees up
-                if (employees.length === 0) {
-                    employees = defaultEmployees;
-                    syncToFirebase();
-                }
-                syncToFirebase();
             }
+        } catch (error) {
+            console.error("Server Fetch Error:", error);
+        } finally {
             isStorageReady = true;
-        }, (error) => {
-            console.error("Firebase Snapshot Error:", error);
-            isStorageReady = true;
-        });
+        }
     }
 
 
@@ -323,7 +230,7 @@ function initApp() {
                 // update initials just in case name changed
                 employees[empIndex].initial = employees[empIndex].name.split(' ').map(n=>n[0]).join('').toUpperCase();
                 
-                syncToFirebase();
+                syncToServer();
                 renderEmployeeGrid();
                 
                 if (typeof renderDailyAttendance === 'function') renderDailyAttendance();
@@ -361,7 +268,7 @@ function initApp() {
             const newEmp = { id, name, initial, bg, role, salaryType, salaryAmount };
             employees.push(newEmp);
             
-            syncToFirebase();
+            syncToServer();
             renderEmployeeGrid();
             
             if (typeof renderDailyAttendance === 'function') renderDailyAttendance();
@@ -550,10 +457,10 @@ function initApp() {
                 bulkAttendanceData[selectedDate][empId] = newStatus;
                 
                 // Save locally but bypass the heavy bulk sync hook
-                syncToFirebase();
+                syncToServer();
                 
                 // Trigger Firebase sync
-                syncToFirebase();
+                syncToServer();
                 
                 // Re-render calendar to update colors
                 renderCalendar();
@@ -833,8 +740,8 @@ function initApp() {
                 date: todayStr
             });
             
-            syncToFirebase();
-            syncToFirebase();
+            syncToServer();
+            syncToServer();
             
             inputAdvanceAmt.value = '';
             selectEmpAdvance.value = '';
