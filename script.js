@@ -669,31 +669,113 @@ function initApp() {
     const btnDownloadPdf = document.getElementById('btn-download-pdf');
     if (btnDownloadPdf) {
         btnDownloadPdf.addEventListener('click', () => {
-            const element = document.getElementById('salary-report-content');
-            if (element) {
-                const opt = {
-                    margin:       0.5,
-                    filename:     `Salary_Payout_${salaryMonthPicker ? salaryMonthPicker.value : 'Report'}.pdf`,
-                    image:        { type: 'jpeg', quality: 0.98 },
-                    html2canvas:  { scale: 2 },
-                    jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-                };
+            const selectedMonthVal = salaryMonthPicker ? salaryMonthPicker.value : '';
+            if(!selectedMonthVal) return;
+            const [yearStr, monthStr] = selectedMonthVal.split('-');
+            const daysInMonth = getDaysInMonth(parseInt(yearStr), parseInt(monthStr));
+            
+            let html = `
+                <div style="font-family: sans-serif; padding: 20px; color: #333;">
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <h1 style="color: #03488f; margin: 0;">Bellad Petrol Bunk</h1>
+                        <h2 style="margin: 5px 0 0 0; color: #555;">Salary Report - ${selectedMonthVal}</h2>
+                    </div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                        <thead>
+                            <tr style="background-color: #f1f5f9;">
+                                <th style="border: 1px solid #cbd5e1; padding: 10px; text-align: left;">Employee Name</th>
+                                <th style="border: 1px solid #cbd5e1; padding: 10px; text-align: center;">Base Salary</th>
+                                <th style="border: 1px solid #cbd5e1; padding: 10px; text-align: center;">Total Days</th>
+                                <th style="border: 1px solid #cbd5e1; padding: 10px; text-align: center;">Present</th>
+                                <th style="border: 1px solid #cbd5e1; padding: 10px; text-align: center;">Absent</th>
+                                <th style="border: 1px solid #cbd5e1; padding: 10px; text-align: center;">Half Day</th>
+                                <th style="border: 1px solid #cbd5e1; padding: 10px; text-align: right;">Net Payout</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            let totalEstimatedPayout = 0;
+            
+            employees.forEach(emp => {
+                let daysPresent = 0;
+                let daysAbsent = 0;
+                let daysHalf = 0;
                 
-                // Optional: add loading state to button
-                const originalHtml = btnDownloadPdf.innerHTML;
-                btnDownloadPdf.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
-                btnDownloadPdf.disabled = true;
+                for(let d=1; d<=daysInMonth; d++) {
+                    const dateStr = `${yearStr}-${String(monthStr).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                    const dailyRecord = bulkAttendanceData[dateStr];
+                    if (dailyRecord && dailyRecord[emp.id]) {
+                        const status = dailyRecord[emp.id];
+                        if (status === 'Present') daysPresent += 1;
+                        else if (status === 'Half Day') { daysHalf += 1; daysPresent += 0.5; }
+                        else if (status === 'Absent') daysAbsent += 1;
+                    }
+                }
                 
-                html2pdf().set(opt).from(element).save().then(() => {
-                    btnDownloadPdf.innerHTML = originalHtml;
-                    btnDownloadPdf.disabled = false;
-                }).catch(err => {
-                    console.error('PDF Generation Error:', err);
-                    btnDownloadPdf.innerHTML = originalHtml;
-                    btnDownloadPdf.disabled = false;
-                    alert('Error generating PDF. Please try again.');
-                });
-            }
+                let baseAmount = emp.salaryAmount || 0;
+                let earned = 0;
+                if (emp.salaryType === 'monthly') {
+                    const perDay = baseAmount / daysInMonth;
+                    earned = perDay * daysPresent;
+                } else {
+                    earned = baseAmount * daysPresent;
+                }
+                
+                const advances = advanceHistory.filter(a => a.empId === emp.id && a.date.startsWith(selectedMonthVal));
+                const totalAdvance = advances.reduce((sum, a) => sum + a.amount, 0);
+                const finalPayout = Math.max(0, earned - totalAdvance);
+                totalEstimatedPayout += finalPayout;
+                
+                html += `
+                    <tr>
+                        <td style="border: 1px solid #cbd5e1; padding: 10px;">${emp.name}</td>
+                        <td style="border: 1px solid #cbd5e1; padding: 10px; text-align: center;">${emp.salaryType === 'monthly' ? '₹'+baseAmount+'/mo' : '₹'+baseAmount+'/day'}</td>
+                        <td style="border: 1px solid #cbd5e1; padding: 10px; text-align: center;">${daysInMonth}</td>
+                        <td style="border: 1px solid #cbd5e1; padding: 10px; text-align: center;">${daysPresent}</td>
+                        <td style="border: 1px solid #cbd5e1; padding: 10px; text-align: center;">${daysAbsent}</td>
+                        <td style="border: 1px solid #cbd5e1; padding: 10px; text-align: center;">${daysHalf}</td>
+                        <td style="border: 1px solid #cbd5e1; padding: 10px; text-align: right; font-weight: bold;">₹${finalPayout.toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                        </tbody>
+                        <tfoot>
+                            <tr style="background-color: #e2e8f0;">
+                                <td colspan="6" style="border: 1px solid #cbd5e1; padding: 12px; text-align: right; font-weight: bold; font-size: 16px;">Total Estimated Payout:</td>
+                                <td style="border: 1px solid #cbd5e1; padding: 12px; text-align: right; font-weight: bold; font-size: 16px; color: #03488f;">₹${totalEstimatedPayout.toFixed(2)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            `;
+            
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = html;
+            
+            const opt = {
+                margin:       0.4,
+                filename:     `Bellad_Salary_Report_${selectedMonthVal}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2 },
+                jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' }
+            };
+            
+            const originalHtml = btnDownloadPdf.innerHTML;
+            btnDownloadPdf.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
+            btnDownloadPdf.disabled = true;
+            
+            html2pdf().set(opt).from(tempDiv).save().then(() => {
+                btnDownloadPdf.innerHTML = originalHtml;
+                btnDownloadPdf.disabled = false;
+            }).catch(err => {
+                console.error('PDF Generation Error:', err);
+                btnDownloadPdf.innerHTML = originalHtml;
+                btnDownloadPdf.disabled = false;
+                alert('Error generating PDF. Please try again.');
+            });
         });
     }
     
