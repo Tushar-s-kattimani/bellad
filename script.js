@@ -665,12 +665,11 @@ function initApp() {
 
             const formattedPay = calculatedPay.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
             const formattedBase = `₹${emp.salaryAmount}/${emp.salaryType === 'monthly' ? 'mo' : 'day'} (₹${dailyRate.toFixed(2)}/day)`;
-            
             const absentText = daysAbsent > 0 ? `<div style="color: #dc2626; font-weight: 500;">${daysAbsent}</div><div style="font-size: 11px; color: #ef4444;">(${absentDates.join(', ')})</div>` : `<div style="color: #dc2626;">0</div>`;
-
-            let breakdownHTML = `Earned: ₹${financials.earned.toFixed(2)}<br>Deducted: ₹${deduction.toFixed(2)}<br><strong>Net Payable: ₹${calculatedPay.toFixed(2)}</strong>`;
+            
+            let breakdownHTML = `<div style="font-weight: 700;">Net Payable: ${formattedPay}</div>`;
             if (remainingAdvance > 0) {
-                breakdownHTML += `<div style="font-size: 12px; color: #ef4444; margin-top: 4px; font-weight: 500;">Carried Balance: ₹${remainingAdvance.toFixed(2)}</div>`;
+                breakdownHTML += `<div style="font-size: 13px; color: #dc2626; margin-top: 4px; font-weight: 600;">Balance: ₹${remainingAdvance.toFixed(2)}</div>`;
             }
 
             const row = `
