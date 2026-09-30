@@ -199,6 +199,7 @@ function initApp() {
                     <p class="emp-id" style="font-weight: 500; color: var(--primary-blue);">Base: ${emp.salaryType === 'monthly' ? '₹'+emp.salaryAmount+'/mo' : '₹'+emp.salaryAmount+'/day'}</p>
                     <div class="employee-actions">
                         <button class="btn-icon btn-edit-emp" data-id="${emp.id}" title="Edit Profile & Salary"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn-icon btn-delete-emp" data-id="${emp.id}" title="Delete Employee" style="color: #ff4d4f;"><i class="fa-solid fa-trash"></i></button>
                     </div>
                 </div>
             `;
@@ -216,6 +217,21 @@ function initApp() {
                     document.getElementById('edit-emp-salary-type').value = emp.salaryType || 'monthly';
                     document.getElementById('edit-emp-salary-amount').value = emp.salaryAmount || 0;
                     employeeEditModal.classList.add('active');
+                }
+            });
+        });
+
+        // Bind Delete buttons
+        document.querySelectorAll('.btn-delete-emp').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const empId = e.currentTarget.dataset.id;
+                if (confirm('Are you sure you want to delete this employee?')) {
+                    employees = employees.filter(emp => emp.id !== empId);
+                    syncToServer();
+                    renderEmployeeGrid();
+                    if (typeof renderDailyAttendance === 'function') renderDailyAttendance();
+                    if (typeof renderSalaryTable === 'function') renderSalaryTable();
+                    if (typeof renderDashboard === 'function') renderDashboard();
                 }
             });
         });
