@@ -675,21 +675,20 @@ function initApp() {
             const daysInMonth = getDaysInMonth(parseInt(yearStr), parseInt(monthStr));
             
             let html = `
-                <div style="font-family: sans-serif; padding: 20px; color: #333;">
+                <div style="font-family: sans-serif; padding: 20px; color: #000;">
                     <div style="text-align: center; margin-bottom: 20px;">
-                        <h1 style="color: #03488f; margin: 0;">Bellad Petrol Bunk</h1>
-                        <h2 style="margin: 5px 0 0 0; color: #555;">Salary Report - ${selectedMonthVal}</h2>
+                        <h1 style="margin: 0; font-size: 24px;">Bellad Petrol Bunk</h1>
+                        <h2 style="margin: 5px 0 0 0; font-size: 18px; font-weight: normal;">Salary Report - ${selectedMonthVal}</h2>
                     </div>
                     <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
                         <thead>
-                            <tr style="background-color: #f1f5f9;">
-                                <th style="border: 1px solid #cbd5e1; padding: 10px; text-align: left;">Employee Name</th>
-                                <th style="border: 1px solid #cbd5e1; padding: 10px; text-align: center;">Base Salary</th>
-                                <th style="border: 1px solid #cbd5e1; padding: 10px; text-align: center;">Total Days</th>
-                                <th style="border: 1px solid #cbd5e1; padding: 10px; text-align: center;">Present</th>
-                                <th style="border: 1px solid #cbd5e1; padding: 10px; text-align: center;">Absent</th>
-                                <th style="border: 1px solid #cbd5e1; padding: 10px; text-align: center;">Half Day</th>
-                                <th style="border: 1px solid #cbd5e1; padding: 10px; text-align: right;">Net Payout</th>
+                            <tr>
+                                <th style="border: 1px solid #000; padding: 10px; text-align: left; font-weight: bold;">Employee Name</th>
+                                <th style="border: 1px solid #000; padding: 10px; text-align: center; font-weight: bold;">Total Days</th>
+                                <th style="border: 1px solid #000; padding: 10px; text-align: center; font-weight: bold;">Present</th>
+                                <th style="border: 1px solid #000; padding: 10px; text-align: center; font-weight: bold;">Absent</th>
+                                <th style="border: 1px solid #000; padding: 10px; text-align: center; font-weight: bold;">Half Day</th>
+                                <th style="border: 1px solid #000; padding: 10px; text-align: right; font-weight: bold;">Net Payout</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -729,13 +728,12 @@ function initApp() {
                 
                 html += `
                     <tr>
-                        <td style="border: 1px solid #cbd5e1; padding: 10px;">${emp.name}</td>
-                        <td style="border: 1px solid #cbd5e1; padding: 10px; text-align: center;">${emp.salaryType === 'monthly' ? '₹'+baseAmount+'/mo' : '₹'+baseAmount+'/day'}</td>
-                        <td style="border: 1px solid #cbd5e1; padding: 10px; text-align: center;">${daysInMonth}</td>
-                        <td style="border: 1px solid #cbd5e1; padding: 10px; text-align: center;">${daysPresent}</td>
-                        <td style="border: 1px solid #cbd5e1; padding: 10px; text-align: center;">${daysAbsent}</td>
-                        <td style="border: 1px solid #cbd5e1; padding: 10px; text-align: center;">${daysHalf}</td>
-                        <td style="border: 1px solid #cbd5e1; padding: 10px; text-align: right; font-weight: bold;">₹${finalPayout.toFixed(2)}</td>
+                        <td style="border: 1px solid #000; padding: 10px;">${emp.name}</td>
+                        <td style="border: 1px solid #000; padding: 10px; text-align: center;">${daysInMonth}</td>
+                        <td style="border: 1px solid #000; padding: 10px; text-align: center;">${daysPresent}</td>
+                        <td style="border: 1px solid #000; padding: 10px; text-align: center;">${daysAbsent}</td>
+                        <td style="border: 1px solid #000; padding: 10px; text-align: center;">${daysHalf}</td>
+                        <td style="border: 1px solid #000; padding: 10px; text-align: right;">₹${finalPayout.toFixed(2)}</td>
                     </tr>
                 `;
             });
@@ -743,9 +741,9 @@ function initApp() {
             html += `
                         </tbody>
                         <tfoot>
-                            <tr style="background-color: #e2e8f0;">
-                                <td colspan="6" style="border: 1px solid #cbd5e1; padding: 12px; text-align: right; font-weight: bold; font-size: 16px;">Total Estimated Payout:</td>
-                                <td style="border: 1px solid #cbd5e1; padding: 12px; text-align: right; font-weight: bold; font-size: 16px; color: #03488f;">₹${totalEstimatedPayout.toFixed(2)}</td>
+                            <tr>
+                                <td colspan="5" style="border: 1px solid #000; padding: 12px; text-align: right; font-weight: bold;">Total Estimated Payout:</td>
+                                <td style="border: 1px solid #000; padding: 12px; text-align: right; font-weight: bold;">₹${totalEstimatedPayout.toFixed(2)}</td>
                             </tr>
                         </tfoot>
                     </table>
