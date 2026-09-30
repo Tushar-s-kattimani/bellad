@@ -74,7 +74,9 @@ function initApp() {
 
         try {
             isStorageReady = false;
-            const response = await fetch(`/api/data/${encodeURIComponent(currentUserEmail)}`);
+            const response = await fetch(`/api/data/${encodeURIComponent(currentUserEmail)}`, {
+                cache: 'no-store'
+            });
             if (response.ok) {
                 const data = await response.json();
                 

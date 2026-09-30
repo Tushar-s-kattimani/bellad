@@ -33,6 +33,12 @@ app.get('/api/data/:email', async (req, res) => {
     try {
         const email = req.params.email;
         console.log(`GET /api/data/${email}`);
+        
+        // Prevent Vercel edge caching
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        
         let data = await UserData.findOne({ email });
         
         if (!data) {
