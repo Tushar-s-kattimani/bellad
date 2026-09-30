@@ -408,7 +408,7 @@ function initApp() {
         }
         const recordsForDate = bulkAttendanceData[selectedDate] || {};
         
-        if (lastRenderedDate === selectedDate && dailyAttendanceBody.children.length > 0) {
+        if (lastRenderedDate === selectedDate && dailyAttendanceBody.children.length === employees.length && employees.length > 0) {
             // Just update radio buttons without rebuilding DOM
             employees.forEach(emp => {
                 const status = recordsForDate[emp.id] || '';
