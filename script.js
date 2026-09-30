@@ -554,6 +554,63 @@ function initApp() {
         return new Date(year, month, 0).getDate();
     }
 
+    function getEmployeeMonthFinancials(empId, targetMonthStr) {
+        const monthsSet = new Set();
+        Object.keys(bulkAttendanceData).forEach(dateStr => {
+            const m = dateStr.substring(0, 7);
+            if (m <= targetMonthStr) monthsSet.add(m);
+        });
+        advanceHistory.forEach(adv => {
+            if (adv.empId === empId) {
+                const m = adv.date.substring(0, 7);
+                if (m <= targetMonthStr) monthsSet.add(m);
+            }
+        });
+        monthsSet.add(targetMonthStr);
+        const sortedMonths = Array.from(monthsSet).sort();
+        
+        let balance = 0;
+        let targetData = { openingBal: 0, advance: 0, earned: 0, deduction: 0, payout: 0, closingBal: 0 };
+        const emp = employees.find(e => e.id === empId);
+        if (!emp) return targetData;
+        
+        for (const mStr of sortedMonths) {
+            let [y, m] = mStr.split('-');
+            let days = getDaysInMonth(parseInt(y), parseInt(m));
+            let daysPresent = 0;
+            
+            for (let d = 1; d <= days; d++) {
+                const dStr = `${mStr}-${String(d).padStart(2, '0')}`;
+                if (bulkAttendanceData[dStr] && bulkAttendanceData[dStr][empId]) {
+                    if (bulkAttendanceData[dStr][empId] === 'Present') daysPresent += 1;
+                    else if (bulkAttendanceData[dStr][empId] === 'Half Day') daysPresent += 0.5;
+                }
+            }
+            
+            let earned = 0;
+            if (emp.salaryType === 'monthly') earned = (emp.salaryAmount / days) * daysPresent;
+            else earned = emp.salaryAmount * daysPresent;
+            
+            let advanceGiven = 0;
+            advanceHistory.forEach(a => {
+                if (a.empId === empId && a.date.startsWith(mStr)) {
+                    advanceGiven += a.amount;
+                }
+            });
+            
+            let totalDebt = balance + advanceGiven;
+            let deduction = Math.min(earned, totalDebt);
+            let payout = earned - deduction;
+            let closingBal = totalDebt - deduction;
+            
+            if (mStr === targetMonthStr) {
+                targetData = { openingBal: balance, advance: advanceGiven, earned, deduction, payout, closingBal };
+            }
+            balance = closingBal;
+        }
+        return targetData;
+    }
+
     function renderSalaryTable() {
         if (!salaryTableBody || !salaryMonthPicker) return;
         
@@ -598,28 +655,11 @@ function initApp() {
                 }
             }
 
-            let calculatedPay = 0;
-            let dailyRate = 0;
-            if (emp.salaryType === 'monthly') {
-                dailyRate = emp.salaryAmount / daysInMonth;
-                calculatedPay = dailyRate * daysPresent;
-            } else {
-                dailyRate = emp.salaryAmount;
-                calculatedPay = emp.salaryAmount * daysPresent;
-            }
-            
-            // Advance Deduction Logic
-            // Make sure advanceBalances is accessible here
-            const allAdvances = advanceBalances;
-            const advanceBalance = allAdvances[emp.id] || 0;
-            let deduction = 0;
-            let remainingAdvance = advanceBalance;
-            
-            if (advanceBalance > 0) {
-                deduction = Math.min(calculatedPay, advanceBalance);
-                remainingAdvance = advanceBalance - deduction;
-                calculatedPay -= deduction;
-            }
+            const financials = getEmployeeMonthFinancials(emp.id, selectedMonthVal);
+            const calculatedPay = financials.payout;
+            const deduction = financials.deduction;
+            const remainingAdvance = financials.closingBal;
+            const dailyRate = emp.salaryType === 'monthly' ? (emp.salaryAmount / daysInMonth) : emp.salaryAmount;
             
             totalEstimatedPayout += calculatedPay;
 
@@ -628,9 +668,9 @@ function initApp() {
             
             const absentText = daysAbsent > 0 ? `<div style="color: #dc2626; font-weight: 500;">${daysAbsent}</div><div style="font-size: 11px; color: #ef4444;">(${absentDates.join(', ')})</div>` : `<div style="color: #dc2626;">0</div>`;
 
-            let breakdownHTML = `Net Payable: ${formattedPay}`;
-            if (advanceBalance > 0) {
-                breakdownHTML = `Net Payable: ${formattedPay}<div style="font-size: 12px; color: #ef4444; margin-top: 4px; font-weight: 500;">Balance Adv.: ₹${remainingAdvance.toFixed(2)}</div>`;
+            let breakdownHTML = `Earned: ₹${financials.earned.toFixed(2)}<br>Deducted: ₹${deduction.toFixed(2)}<br><strong>Net Payable: ₹${calculatedPay.toFixed(2)}</strong>`;
+            if (remainingAdvance > 0) {
+                breakdownHTML += `<div style="font-size: 12px; color: #ef4444; margin-top: 4px; font-weight: 500;">Carried Balance: ₹${remainingAdvance.toFixed(2)}</div>`;
             }
 
             const row = `
@@ -684,11 +724,10 @@ function initApp() {
                         <thead>
                             <tr>
                                 <th style="border: 1px solid #000; padding: 10px; text-align: left; font-weight: bold;">Employee Name</th>
-                                <th style="border: 1px solid #000; padding: 10px; text-align: center; font-weight: bold;">Total Days</th>
-                                <th style="border: 1px solid #000; padding: 10px; text-align: center; font-weight: bold;">Present</th>
-                                <th style="border: 1px solid #000; padding: 10px; text-align: center; font-weight: bold;">Absent</th>
-                                <th style="border: 1px solid #000; padding: 10px; text-align: center; font-weight: bold;">Half Day</th>
-                                <th style="border: 1px solid #000; padding: 10px; text-align: right; font-weight: bold;">Net Payout</th>
+                                <th style="border: 1px solid #000; padding: 10px; text-align: center; font-weight: bold;">Earned (₹)</th>
+                                <th style="border: 1px solid #000; padding: 10px; text-align: center; font-weight: bold;">Advance/Old Balance (₹)</th>
+                                <th style="border: 1px solid #000; padding: 10px; text-align: right; font-weight: bold;">Net Payout (₹)</th>
+                                <th style="border: 1px solid #000; padding: 10px; text-align: right; font-weight: bold;">Carried Balance (₹)</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -697,43 +736,17 @@ function initApp() {
             let totalEstimatedPayout = 0;
             
             employees.forEach(emp => {
-                let daysPresent = 0;
-                let daysAbsent = 0;
-                let daysHalf = 0;
-                
-                for(let d=1; d<=daysInMonth; d++) {
-                    const dateStr = `${yearStr}-${String(monthStr).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                    const dailyRecord = bulkAttendanceData[dateStr];
-                    if (dailyRecord && dailyRecord[emp.id]) {
-                        const status = dailyRecord[emp.id];
-                        if (status === 'Present') daysPresent += 1;
-                        else if (status === 'Half Day') { daysHalf += 1; daysPresent += 0.5; }
-                        else if (status === 'Absent') daysAbsent += 1;
-                    }
-                }
-                
-                let baseAmount = emp.salaryAmount || 0;
-                let earned = 0;
-                if (emp.salaryType === 'monthly') {
-                    const perDay = baseAmount / daysInMonth;
-                    earned = perDay * daysPresent;
-                } else {
-                    earned = baseAmount * daysPresent;
-                }
-                
-                const advances = advanceHistory.filter(a => a.empId === emp.id && a.date.startsWith(selectedMonthVal));
-                const totalAdvance = advances.reduce((sum, a) => sum + a.amount, 0);
-                const finalPayout = Math.max(0, earned - totalAdvance);
-                totalEstimatedPayout += finalPayout;
+                const financials = getEmployeeMonthFinancials(emp.id, selectedMonthVal);
+                const totalDebtThisMonth = financials.openingBal + financials.advance;
+                totalEstimatedPayout += financials.payout;
                 
                 html += `
                     <tr>
                         <td style="border: 1px solid #000; padding: 10px;">${emp.name}</td>
-                        <td style="border: 1px solid #000; padding: 10px; text-align: center;">${daysInMonth}</td>
-                        <td style="border: 1px solid #000; padding: 10px; text-align: center;">${daysPresent}</td>
-                        <td style="border: 1px solid #000; padding: 10px; text-align: center;">${daysAbsent}</td>
-                        <td style="border: 1px solid #000; padding: 10px; text-align: center;">${daysHalf}</td>
-                        <td style="border: 1px solid #000; padding: 10px; text-align: right;">₹${finalPayout.toFixed(2)}</td>
+                        <td style="border: 1px solid #000; padding: 10px; text-align: center;">${financials.earned.toFixed(2)}</td>
+                        <td style="border: 1px solid #000; padding: 10px; text-align: center;">${totalDebtThisMonth.toFixed(2)}</td>
+                        <td style="border: 1px solid #000; padding: 10px; text-align: right; font-weight: bold;">${financials.payout.toFixed(2)}</td>
+                        <td style="border: 1px solid #000; padding: 10px; text-align: right; color: ${financials.closingBal > 0 ? '#dc2626' : '#000'};">${financials.closingBal.toFixed(2)}</td>
                     </tr>
                 `;
             });
@@ -742,8 +755,9 @@ function initApp() {
                         </tbody>
                         <tfoot>
                             <tr>
-                                <td colspan="5" style="border: 1px solid #000; padding: 12px; text-align: right; font-weight: bold;">Total Estimated Payout:</td>
+                                <td colspan="3" style="border: 1px solid #000; padding: 12px; text-align: right; font-weight: bold;">Total Estimated Payout:</td>
                                 <td style="border: 1px solid #000; padding: 12px; text-align: right; font-weight: bold;">₹${totalEstimatedPayout.toFixed(2)}</td>
+                                <td style="border: 1px solid #000; padding: 12px;"></td>
                             </tr>
                         </tfoot>
                     </table>
