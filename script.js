@@ -853,11 +853,8 @@ function initApp() {
                 advanceBalances = {};
                 advanceHistory = [];
                 
-                // Clear from LocalStorage
-                
-                
-                
-                
+                // Save the cleared data to MongoDB
+                syncToServer();
                 // Re-render UI components
                 if (typeof renderCalendar === 'function') renderCalendar();
                 if (typeof renderDailyAttendance === 'function') renderDailyAttendance();
