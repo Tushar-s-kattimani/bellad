@@ -32,6 +32,7 @@ const UserData = mongoose.model('UserData', userDataSchema);
 app.get('/api/data/:email', async (req, res) => {
     try {
         const email = req.params.email;
+        console.log(`GET /api/data/${email}`);
         let data = await UserData.findOne({ email });
         
         if (!data) {
@@ -81,7 +82,13 @@ app.use(express.static('./', {
     }
 })); // Serve index.html, script.js, styles.css
 
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Access this server on your mobile at your computer's IP address (e.g., http://192.168.x.x:${PORT})`);
-});
+// Conditionally listen if we are not running on Vercel
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, '0.0.0.0', () => {
+        console.log(`Server running on port ${PORT}`);
+        console.log(`Access this server on your mobile at your computer's IP address (e.g., http://192.168.x.x:${PORT})`);
+    });
+}
+
+// Export for Vercel serverless function
+module.exports = app;
