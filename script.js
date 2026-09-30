@@ -70,6 +70,7 @@ function initApp() {
 
     async function loadFromServer() {
         if (!currentUserEmail) return;
+        if (isSyncing || syncTimeout) return; // Don't override if we are actively saving local changes
 
         try {
             isStorageReady = false;
@@ -107,6 +108,9 @@ function initApp() {
             isStorageReady = true;
         }
     }
+
+    // Poll for updates every 3 seconds to keep other devices in sync
+    setInterval(loadFromServer, 3000);
 
 
     // Handle SPA navigation
